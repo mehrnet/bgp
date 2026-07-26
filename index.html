@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f1417">
   <meta name="description" content="MehrNet BGP public IP and route intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260726-2355">
+  <link rel="stylesheet" href="style.css?v=20260727-0010">
 </head>
 <body>
   <header class="nav">
@@ -24,29 +24,27 @@
 
   <main class="page">
     <header class="page-header">
-      <div>
-        <p class="kicker">Network intelligence</p>
-        <h1>IP address lookup</h1>
-      </div>
-      <p class="request-status" id="request-status" aria-live="polite">Resolving your current connection</p>
+      <p class="kicker">Network intelligence</p>
+      <h1>IP address lookup</h1>
     </header>
 
     <section class="lookup-tools" aria-label="IP lookup">
       <form class="lookup-form" id="lookup-form" novalidate>
         <label class="search-field" for="ip-input">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-search"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0010#icon-search"></use></svg>
           <span class="sr-only">IPv4 or IPv6 address</span>
           <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IPv4 or IPv6 address">
         </label>
         <button class="primary-button" type="submit">
           <span>Lookup</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-arrow-right"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0010#icon-arrow-right"></use></svg>
         </button>
         <button class="secondary-button" type="button" id="current-button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-target"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0010#icon-target"></use></svg>
           <span>My IP</span>
         </button>
       </form>
+      <p class="lookup-error" id="lookup-error" role="alert" hidden></p>
 
       <button class="ipv6-button" id="ipv6-button" type="button" hidden>
         <span class="ipv6-label">
@@ -55,7 +53,7 @@
         </span>
         <span class="ipv6-action">
           View IPv6
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-arrow-right"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0010#icon-arrow-right"></use></svg>
         </span>
       </button>
     </section>
@@ -69,6 +67,6 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=20260726-2355"></script>
+  <script src="app.js?v=20260727-0010"></script>
 </body>
 </html>

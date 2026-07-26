@@ -141,10 +141,6 @@ a:focus-visible {
 }
 
 .page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 32px;
   margin-bottom: 24px;
 }
 
@@ -165,24 +161,18 @@ h1 {
   letter-spacing: 0;
 }
 
-.request-status {
-  max-width: 420px;
-  margin: 0 0 4px;
-  color: var(--text-soft);
-  font-size: 13px;
-  text-align: right;
-}
-
-.request-status[data-tone="success"] {
-  color: var(--success);
-}
-
-.request-status[data-tone="error"] {
-  color: #fda4af;
-}
-
 .lookup-tools {
   margin-bottom: 24px;
+}
+
+.lookup-error {
+  margin: 9px 2px 0;
+  color: #fda4af;
+  font-size: 12px;
+}
+
+.lookup-error[hidden] {
+  display: none;
 }
 
 .lookup-form {
@@ -368,6 +358,18 @@ h1 {
   text-transform: uppercase;
 }
 
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.section-label svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
 .address-line {
   min-width: 0;
   display: flex;
@@ -514,6 +516,19 @@ h1 {
   font-weight: 500;
 }
 
+.quick-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.quick-heading svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
 .record-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -546,10 +561,17 @@ h1 {
   font-weight: 680;
 }
 
-.record-count {
-  color: var(--text-muted);
-  font-family: var(--mono);
-  font-size: 10px;
+.record-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.record-heading svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .record-list {
@@ -744,13 +766,7 @@ h1 {
   }
 
   .page-header {
-    display: block;
     margin-bottom: 20px;
-  }
-
-  .request-status {
-    margin-top: 8px;
-    text-align: left;
   }
 
   .lookup-form {

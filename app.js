@@ -2,11 +2,11 @@
   "use strict";
 
   const API = "https://bgp-api.mehrnet.com";
-  const ICON_SPRITE = "icons.svg?v=20260726-2355";
+  const ICON_SPRITE = "icons.svg?v=20260727-0010";
   const form = document.querySelector("#lookup-form");
   const input = document.querySelector("#ip-input");
   const result = document.querySelector("#result");
-  const requestStatus = document.querySelector("#request-status");
+  const lookupError = document.querySelector("#lookup-error");
   const currentButton = document.querySelector("#current-button");
   const ipv6Button = document.querySelector("#ipv6-button");
   const ipv6Address = document.querySelector("#ipv6-address");
@@ -97,9 +97,9 @@
     return `${start} – ${end}`;
   }
 
-  function statusMessage(message, tone = "") {
-    requestStatus.textContent = message;
-    requestStatus.dataset.tone = tone;
+  function setLookupError(message = "") {
+    lookupError.textContent = message;
+    lookupError.hidden = !message;
   }
 
   function showToast(message) {
@@ -119,8 +119,12 @@
     return `<span class="${className}">${leadingIcon}${escapeHtml(value)}</span>`;
   }
 
-  function quickFact(label, value, leadingIcon = "") {
-    return `<div class="quick-fact"><span class="record-label">${escapeHtml(label)}</span>${valueOrUnavailable(value, leadingIcon)}</div>`;
+  function quickFact(label, value, iconName, leadingIcon = "") {
+    return `
+      <div class="quick-fact">
+        <span class="quick-heading">${icon(iconName)}<span class="record-label">${escapeHtml(label)}</span></span>
+        ${valueOrUnavailable(value, leadingIcon)}
+      </div>`;
   }
 
   function recordRows(fields) {
@@ -134,14 +138,13 @@
       .join("");
   }
 
-  function recordPanel(title, fields) {
+  function recordPanel(title, fields, iconName) {
     const rows = fields.filter((field) => hasValue(field.value));
     if (!rows.length) return "";
     return `
       <section class="record-panel">
         <header class="record-panel-header">
-          <h3>${escapeHtml(title)}</h3>
-          <span class="record-count">${rows.length} fields</span>
+          <span class="record-heading">${icon(iconName)}<h3>${escapeHtml(title)}</h3></span>
         </header>
         <dl class="record-list">${recordRows(rows)}</dl>
       </section>`;
@@ -161,8 +164,7 @@
     return `
       <section class="record-panel">
         <header class="record-panel-header">
-          <h3>Data coverage</h3>
-          <span class="record-count">3 sources</span>
+          <span class="record-heading">${icon("database")}<h3>Data coverage</h3></span>
         </header>
         <div class="source-list">${rows}</div>
       </section>`;
@@ -232,7 +234,7 @@
     result.innerHTML = `
       <section class="result-identity">
         <div class="address-block">
-          <span class="section-label">${resultLabel}</span>
+          <span class="section-label">${icon("globe")}${resultLabel}</span>
           <div class="address-line">
             <h2>${escapeHtml(data.ip)}</h2>
             <button class="copy-button" type="button" data-copy="${escapeHtml(data.ip)}" aria-label="Copy IP address" title="Copy IP address">
@@ -247,23 +249,23 @@
           </div>
         </div>
         <div class="network-block">
-          <span class="section-label">Network</span>
+          <span class="section-label">${icon("network")}Network</span>
           <strong>${escapeHtml(networkName)}</strong>
           ${hasValue(asSubtitle) ? `<span class="network-subtitle">${escapeHtml(asSubtitle)}</span>` : ""}
         </div>
       </section>
 
       <section class="quick-facts" aria-label="Key network facts">
-        ${quickFact("Origin ASN", asn)}
-        ${quickFact("Route prefix", network.cidr)}
-        ${quickFact("Registry", hasValue(registry) ? String(registry).toUpperCase() : "")}
-        ${quickFact("Location", locationName, flag)}
+        ${quickFact("Origin ASN", asn, "network")}
+        ${quickFact("Route prefix", network.cidr, "route")}
+        ${quickFact("Registry", hasValue(registry) ? String(registry).toUpperCase() : "", "registry")}
+        ${quickFact("Location", locationName, "map-pin", flag)}
       </section>
 
       <div class="record-grid">
-        ${recordPanel("BGP route", routeFields)}
-        ${recordPanel("Allocation", allocationFields)}
-        ${recordPanel("Geolocation", locationFields)}
+        ${recordPanel("BGP route", routeFields, "route")}
+        ${recordPanel("Allocation", allocationFields, "registry")}
+        ${recordPanel("Geolocation", locationFields, "map-pin")}
         ${sourcePanel(sources)}
       </div>`;
 
@@ -284,7 +286,7 @@
     const endpoint = kind === "me" ? "/v1/me" : `/v1/ip/${encodeURIComponent(ip)}`;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
 
-    statusMessage(kind === "me" ? "Resolving your current connection" : `Looking up ${ip}`);
+    setLookupError();
     renderLoading();
 
     try {
@@ -304,14 +306,12 @@
       }
 
       input.value = data.ip;
-      statusMessage("Network record loaded", "success");
       renderResult(data, kind);
     } catch (error) {
       if (controller.signal.aborted && activeLookup !== controller) return;
       const message = error.name === "AbortError"
         ? "The lookup took too long. Try again."
         : error.message || "The lookup could not be completed.";
-      statusMessage(message, "error");
       renderError(message);
     } finally {
       window.clearTimeout(timeout);
@@ -345,7 +345,7 @@
     event.preventDefault();
     const ip = input.value.trim();
     if (!isIP(ip)) {
-      statusMessage("Enter a valid IPv4 or IPv6 address", "error");
+      setLookupError("Enter a valid IPv4 or IPv6 address");
       input.focus();
       return;
     }
