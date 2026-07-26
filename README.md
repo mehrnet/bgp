@@ -11,5 +11,6 @@ supports IPv4 and IPv6 lookups through `/v1/ip/:ip`.
 npx wrangler deploy
 ```
 
-The `wrangler.toml` configuration publishes only `public/` as static Worker
-assets and attaches the `bgp.mehrnet.com` custom domain.
+The `wrangler.toml` configuration publishes the repository root as static
+Worker assets. `.assetsignore` excludes repository metadata, Wrangler's local
+temporary files, and deployment configuration from the public asset bundle.

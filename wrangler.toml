@@ -3,7 +3,7 @@ compatibility_date = "2026-07-26"
 workers_dev = false
 
 [assets]
-directory = "./public"
+directory = "."
 not_found_handling = "single-page-application"
 
 [[routes]]
