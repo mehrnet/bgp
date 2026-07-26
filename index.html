@@ -92,6 +92,16 @@
     .current-button { padding: 0 17px; font: 12px var(--mono); white-space: nowrap; }
     .current-button:hover { color: var(--ink); background: var(--surface-raised); }
 
+    .connection-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin-top: 18px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--line); }
+    .connection-path { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 67px; padding: 12px 15px 12px 17px; border: 0; color: var(--ink); background: var(--surface); text-align: left; transition: background .16s; }
+    .connection-path[data-state="ready"] { cursor: pointer; }
+    .connection-path[data-state="ready"]:hover { background: var(--surface-raised); }
+    .connection-path[data-state="unavailable"] { color: var(--faint); cursor: default; }
+    .connection-family { display: block; margin-bottom: 4px; color: var(--faint); font: 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .connection-ip { display: block; min-width: 0; font: 600 14px/1.25 var(--mono); overflow-wrap: anywhere; }
+    .connection-status { flex: 0 0 auto; color: var(--cyan); font: 10px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .connection-path[data-state="unavailable"] .connection-status { color: var(--faint); }
+
     .result { position: relative; margin-top: 26px; border: 1px solid var(--line); border-radius: 6px; background: rgba(22, 28, 30, .92); overflow: hidden; }
     .result::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--orange); }
     .result-summary { display: flex; align-items: stretch; min-height: 102px; border-bottom: 1px solid var(--line); }
@@ -150,6 +160,7 @@
       .input-wrap { border-right: 0; }
       .current-button { grid-column: 1 / -1; min-height: 44px; border-top: 1px solid var(--line); padding: 0 15px; text-align: left; }
       .icon-button { border-left: 1px solid var(--line); border-right: 0; }
+      .connection-paths { grid-template-columns: 1fr; }
       .result-summary { display: block; }
       .summary-ip { min-width: 0; border-right: 0; border-bottom: 1px solid var(--line); padding: 20px 18px; }
       .summary-meta { display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -217,6 +228,16 @@
         </button>
         <button class="current-button" type="button" id="current-button">Use current IP</button>
       </form>
+      <div class="connection-paths" aria-label="Detected connection addresses">
+        <button class="connection-path" id="connection-ipv4" type="button" data-state="checking" disabled>
+          <span><span class="connection-family">IPv4 connection</span><span class="connection-ip">Checking address</span></span>
+          <span class="connection-status">checking</span>
+        </button>
+        <button class="connection-path" id="connection-ipv6" type="button" data-state="checking" disabled>
+          <span><span class="connection-family">IPv6 connection</span><span class="connection-ip">Checking address</span></span>
+          <span class="connection-status">checking</span>
+        </button>
+      </div>
     </section>
 
     <section class="result skeleton" id="result" aria-label="IP lookup result" aria-busy="true">
@@ -247,6 +268,10 @@
       const result = document.querySelector("#result");
       const availability = document.querySelector("#availability");
       const currentButton = document.querySelector("#current-button");
+      const connectionPaths = {
+        ipv4: document.querySelector("#connection-ipv4"),
+        ipv6: document.querySelector("#connection-ipv6")
+      };
       let controller;
 
       const iconCopy = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
@@ -315,6 +340,41 @@
         result.innerHTML = '<div class="empty"><strong>Lookup unavailable</strong>' + escapeHtml(message) + '</div>';
       }
 
+      function setConnectionPath(family, stateName, ip = "") {
+        const path = connectionPaths[family];
+        const ipElement = path.querySelector(".connection-ip");
+        const statusElement = path.querySelector(".connection-status");
+        path.dataset.state = stateName;
+        path.disabled = stateName !== "ready";
+        path.dataset.ip = ip;
+        if (stateName === "ready") {
+          ipElement.textContent = ip;
+          statusElement.textContent = "view record";
+        } else if (stateName === "unavailable") {
+          ipElement.textContent = "Not available";
+          statusElement.textContent = "unavailable";
+        }
+      }
+
+      async function detectConnection(family) {
+        const endpoint = family === "ipv4"
+          ? "https://api4.ipify.org?format=json"
+          : "https://api6.ipify.org?format=json";
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        try {
+          const response = await fetch(endpoint, { signal: controller.signal, headers: { Accept: "application/json" } });
+          if (!response.ok) throw new Error("address lookup failed");
+          const data = await response.json();
+          if (!data || !isIP(data.ip)) throw new Error("invalid address response");
+          setConnectionPath(family, "ready", data.ip);
+        } catch {
+          setConnectionPath(family, "unavailable");
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
       async function lookup(kind, ip = "") {
         if (controller) controller.abort();
         controller = new AbortController();
@@ -359,7 +419,12 @@
         lookup("ip", ip);
       });
       currentButton.addEventListener("click", () => lookup("me"));
+      Object.values(connectionPaths).forEach((path) => path.addEventListener("click", () => {
+        if (path.dataset.ip) lookup("ip", path.dataset.ip);
+      }));
       lookup("me");
+      detectConnection("ipv4");
+      detectConnection("ipv6");
     })();
   </script>
 </body>
