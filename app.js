@@ -279,11 +279,214 @@
     });
   }
 
+  function metadataFields(object) {
+    return [
+      { label: "Registry", value: object.registry },
+      { label: "Source", value: object.source },
+      { label: "Maintainers", value: object.maintainers },
+      { label: "Organization", value: object.organization },
+      { label: "Description", value: object.description },
+      { label: "Created", value: object.created },
+      { label: "Last modified", value: object.last_modified }
+    ];
+  }
+
+  function objectList(title, objects, iconName, type) {
+    if (!Array.isArray(objects) || !objects.length) return "";
+    const rows = objects.map((object) => {
+      const primary = type === "route" ? object.prefix : addressRange(object.start_ip, object.end_ip);
+      const details = type === "route"
+        ? [object.origin_asn, object.relation, object.registry].filter(hasValue).join(" · ")
+        : [object.name, object.country_code || object.country_raw, object.status].filter(hasValue).join(" · ");
+      return `
+        <article class="object-row">
+          <strong>${escapeHtml(primary || "Unspecified range")}</strong>
+          ${hasValue(details) ? `<span>${escapeHtml(details)}</span>` : ""}
+        </article>`;
+    }).join("");
+    return `
+      <section class="record-panel object-panel">
+        <header class="record-panel-header">
+          <span class="record-heading">${icon(iconName)}<h3>${escapeHtml(title)}</h3></span>
+          <span class="object-count">${objects.length}</span>
+        </header>
+        <div class="object-list">${rows}</div>
+      </section>`;
+  }
+
+  function enrichmentPanels(enrichment) {
+    if (!enrichment) return "";
+    const panels = [];
+    if (enrichment.rdap) {
+      panels.push(recordPanel("RDAP registration", [
+        { label: "Name", value: enrichment.rdap.name },
+        { label: "Handle", value: enrichment.rdap.handle },
+        { label: "Type", value: enrichment.rdap.type },
+        { label: "Range", value: addressRange(enrichment.rdap.start_ip, enrichment.rdap.end_ip) },
+        { label: "Country", value: enrichment.rdap.country_code },
+        { label: "Created", value: enrichment.rdap.created },
+        { label: "Last changed", value: enrichment.rdap.last_changed },
+        { label: "Status", value: Array.isArray(enrichment.rdap.status) ? enrichment.rdap.status.join(", ") : "" }
+      ], "registry"));
+    }
+    if (enrichment.routing_status) {
+      panels.push(recordPanel("Routing status", [
+        { label: "Origins", value: Array.isArray(enrichment.routing_status.origins) ? enrichment.routing_status.origins.join(", ") : "" },
+        { label: "First seen", value: enrichment.routing_status.first_seen },
+        { label: "Last seen", value: enrichment.routing_status.last_seen },
+        { label: "Holder", value: enrichment.routing_status.holder },
+        { label: "Announced", value: enrichment.routing_status.announced === true ? "Yes" : enrichment.routing_status.announced === false ? "No" : "" }
+      ], "route"));
+    }
+    return panels.join("");
+  }
+
+  function paginationControl(endpoint, cursor) {
+    if (!hasValue(cursor)) return "";
+    const url = new URL(endpoint, API);
+    url.searchParams.set("cursor", cursor);
+    return `<button class="more-button" type="button" data-next-url="${escapeHtml(`${url.pathname}${url.search}`)}">More results ${icon("arrow-right")}</button>`;
+  }
+
+  function renderPrefixResult(data, endpoint) {
+    const prefix = data.prefix || {};
+    const allocation = data.allocation || {};
+    const routes = data.routes || { items: [] };
+    const country = allocation.country_code || "";
+    const flag = countryFlag(country);
+    const allocationFields = [
+      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip) },
+      { label: "Registry", value: allocation.registry },
+      { label: "Network name", value: allocation.name },
+      { label: "Country", value: allocation.country_code || allocation.country_raw },
+      { label: "Allocation date", value: allocation.allocation_date },
+      { label: "Status", value: allocation.status },
+      ...metadataFields(allocation)
+    ];
+
+    result.removeAttribute("aria-busy");
+    result.innerHTML = `
+      <section class="result-identity">
+        <div class="address-block">
+          <span class="section-label">${icon("route")}Prefix lookup</span>
+          <div class="address-line"><h2>${escapeHtml(prefix.cidr || "CIDR")}</h2></div>
+          <div class="identity-meta">
+            ${hasValue(prefix.version) ? `<span class="meta-chip accent">IPv${escapeHtml(prefix.version)}</span>` : ""}
+            ${hasValue(prefix.prefix_length) ? `<span class="meta-chip">/${escapeHtml(prefix.prefix_length)}</span>` : ""}
+            ${hasValue(country) ? `<span class="meta-chip with-flag">${flag}${escapeHtml(country)}</span>` : ""}
+          </div>
+        </div>
+        <div class="network-block">
+          <span class="section-label">${icon("network")}Address space</span>
+          <strong>${escapeHtml(prefix.address_count || "")}</strong>
+          <span class="network-subtitle">${escapeHtml(addressRange(prefix.start_ip, prefix.end_ip))}</span>
+        </div>
+      </section>
+      <div class="record-grid">
+        ${recordPanel("Allocation", allocationFields, "registry")}
+        ${objectList("Registered route objects", routes.items, "route", "route")}
+        ${enrichmentPanels(data.enrichment)}
+      </div>
+      ${paginationControl(endpoint, routes.next_cursor)}`;
+    bindResultControls();
+  }
+
+  function renderRangeResult(data, endpoint) {
+    const rangeValue = data.range || {};
+    const kind = data.kind || "allocations";
+    const objects = kind === "routes" ? data.routes : data.allocations;
+    result.removeAttribute("aria-busy");
+    result.innerHTML = `
+      <section class="result-identity">
+        <div class="address-block">
+          <span class="section-label">${icon("route")}Range lookup</span>
+          <div class="address-line"><h2>${escapeHtml(addressRange(rangeValue.start_ip, rangeValue.end_ip))}</h2></div>
+          <div class="identity-meta">${hasValue(rangeValue.version) ? `<span class="meta-chip accent">IPv${escapeHtml(rangeValue.version)}</span>` : ""}</div>
+        </div>
+        <div class="network-block">
+          <span class="section-label">${icon("network")}Address space</span>
+          <strong>${escapeHtml(rangeValue.address_count || "")}</strong>
+        </div>
+      </section>
+      <div class="record-grid">
+        ${objectList(kind === "routes" ? "Registered route objects" : "Allocation records", objects, kind === "routes" ? "route" : "registry", kind === "routes" ? "route" : "allocation")}
+      </div>
+      ${paginationControl(endpoint, data.next_cursor)}`;
+    bindResultControls();
+  }
+
+  function renderASNResult(data, endpoint) {
+    const autnum = data.autnum || {};
+    const routes = data.routes || { items: [] };
+    const autnumFields = [
+      { label: "Name", value: autnum.name },
+      { label: "Registry", value: autnum.registry },
+      { label: "Country", value: autnum.country_code || autnum.country_raw },
+      { label: "Organization", value: autnum.organization },
+      { label: "Status", value: autnum.status },
+      ...metadataFields(autnum)
+    ];
+    result.removeAttribute("aria-busy");
+    result.innerHTML = `
+      <section class="result-identity">
+        <div class="address-block">
+          <span class="section-label">${icon("network")}Autonomous system</span>
+          <div class="address-line"><h2>${escapeHtml(data.asn || "ASN")}</h2></div>
+          <div class="identity-meta"><span class="meta-chip accent">AS${escapeHtml(data.as_number || "")}</span></div>
+        </div>
+        <div class="network-block">
+          <span class="section-label">${icon("registry")}Registered identity</span>
+          <strong>${escapeHtml(autnum.name || autnum.organization || "No aut-num record")}</strong>
+          ${hasValue(autnum.country_code) ? `<span class="network-subtitle">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
+        </div>
+      </section>
+      <div class="record-grid">
+        ${recordPanel("Aut-num record", autnumFields, "registry")}
+        ${objectList("Registered route objects", routes.items, "route", "route")}
+        ${enrichmentPanels(data.enrichment)}
+      </div>
+      ${paginationControl(endpoint, routes.next_cursor)}`;
+    bindResultControls();
+  }
+
+  function bindResultControls() {
+    result.querySelectorAll("[data-next-url]").forEach((button) => {
+      button.addEventListener("click", () => lookupEndpoint(button.dataset.nextUrl, "resource"));
+    });
+  }
+
+  function renderResourceResult(data, endpoint) {
+    if (data.prefix) {
+      renderPrefixResult(data, endpoint);
+    } else if (data.range) {
+      renderRangeResult(data, endpoint);
+    } else if (data.asn) {
+      renderASNResult(data, endpoint);
+    } else {
+      renderError("The API returned an unsupported lookup response.");
+    }
+  }
+
+  function classifyQuery(value) {
+    if (isIP(value)) return { kind: "ip", endpoint: `/v1/ip/${encodeURIComponent(value)}` };
+    if (/^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(value)) return { kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(value)}` };
+    if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn/${encodeURIComponent(value)}` };
+    const match = value.match(/^\s*([^\s]+)\s+-\s+([^\s]+)\s*$/);
+    if (match && isIP(match[1]) && isIP(match[2])) {
+      return { kind: "range", endpoint: `/v1/range?start=${encodeURIComponent(match[1])}&end=${encodeURIComponent(match[2])}` };
+    }
+    return null;
+  }
+
   async function lookup(kind, ip = "") {
+	const endpoint = kind === "me" ? "/v1/me" : `/v1/ip/${encodeURIComponent(ip)}`;
+	return lookupEndpoint(endpoint, kind);
+  }
+
+  async function lookupEndpoint(endpoint, kind) {
     if (activeLookup) activeLookup.abort();
     const controller = new AbortController();
     activeLookup = controller;
-    const endpoint = kind === "me" ? "/v1/me" : `/v1/ip/${encodeURIComponent(ip)}`;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
 
     setLookupError();
@@ -301,12 +504,16 @@
       }
 
       const data = await response.json();
-      if (!data || !isIP(data.ip)) {
-        throw new Error("The API returned an invalid address record.");
+      if (!data) {
+        throw new Error("The API returned an empty response.");
       }
-
-      input.value = data.ip;
-      renderResult(data, kind);
+      if (kind === "me" || kind === "ip") {
+        if (!isIP(data.ip)) throw new Error("The API returned an invalid address record.");
+        input.value = data.ip;
+        renderResult(data, kind);
+      } else {
+        renderResourceResult(data, endpoint);
+      }
     } catch (error) {
       if (controller.signal.aborted && activeLookup !== controller) return;
       const message = error.name === "AbortError"
@@ -343,13 +550,14 @@
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const ip = input.value.trim();
-    if (!isIP(ip)) {
-      setLookupError("Enter a valid IPv4 or IPv6 address");
+    const query = input.value.trim();
+    const lookupQuery = classifyQuery(query);
+    if (!lookupQuery) {
+      setLookupError("Enter an IP address, CIDR, range, or AS number");
       input.focus();
       return;
     }
-    lookup("ip", ip);
+    lookupEndpoint(lookupQuery.endpoint, lookupQuery.kind);
   });
 
   currentButton.addEventListener("click", () => lookup("me"));

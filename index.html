@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f1417">
-  <meta name="description" content="MehrNet BGP public IP and route intelligence lookup.">
+  <meta name="description" content="MehrNet BGP IP, CIDR, range, and ASN intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260727-0010">
+  <link rel="stylesheet" href="style.css?v=20260727-0200">
 </head>
 <body>
   <header class="nav">
@@ -25,15 +25,15 @@
   <main class="page">
     <header class="page-header">
       <p class="kicker">Network intelligence</p>
-      <h1>IP address lookup</h1>
+      <h1>Network lookup</h1>
     </header>
 
-    <section class="lookup-tools" aria-label="IP lookup">
+    <section class="lookup-tools" aria-label="Network lookup">
       <form class="lookup-form" id="lookup-form" novalidate>
         <label class="search-field" for="ip-input">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0010#icon-search"></use></svg>
-          <span class="sr-only">IPv4 or IPv6 address</span>
-          <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IPv4 or IPv6 address">
+          <span class="sr-only">IP address, CIDR, range, or AS number</span>
+          <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IP address, CIDR, range, or AS number">
         </label>
         <button class="primary-button" type="submit">
           <span>Lookup</span>
@@ -58,7 +58,7 @@
       </button>
     </section>
 
-    <section id="result" class="result" aria-label="IP lookup result" aria-busy="true">
+    <section id="result" class="result" aria-label="Network lookup result" aria-busy="true">
       <div class="loading-panel">
         <span class="spinner" aria-hidden="true"></span>
         <span>Loading network record</span>
@@ -67,6 +67,6 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=20260727-0010"></script>
+  <script src="app.js?v=20260727-0200"></script>
 </body>
 </html>
