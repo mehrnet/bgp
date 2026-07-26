@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111517">
+  <meta name="description" content="MehrNet BGP IP intelligence lookup.">
+  <title>BGP Lookup | MehrNet</title>
+  <style>
+    :root {
+      --ink: #f0eee8;
+      --muted: #9ba5a3;
+      --faint: #687270;
+      --canvas: #111517;
+      --surface: #161c1e;
+      --surface-raised: #1b2325;
+      --line: #303b3d;
+      --line-soft: #242d2f;
+      --orange: #f47c28;
+      --orange-dim: #9d4919;
+      --green: #5cc982;
+      --cyan: #62c8d3;
+      --red: #ed6a5e;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--canvas); color-scheme: dark; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 14px/1.45 var(--sans);
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+    .grid-field {
+      position: fixed;
+      z-index: -1;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: repeat(9, 1fr);
+      pointer-events: none;
+      opacity: .58;
+    }
+    .grid-field i { border-right: 1px solid rgba(132, 151, 149, .07); border-bottom: 1px solid rgba(132, 151, 149, .07); }
+    .grid-field i:nth-child(7n) { border-color: rgba(244, 124, 40, .105); }
+    .grid-field i:nth-child(17n) { background: rgba(98, 200, 211, .025); }
+
+    .topbar { border-bottom: 1px solid var(--line); background: rgba(17, 21, 23, .96); }
+    .topbar-inner, main, .footer-inner { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar-inner { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; letter-spacing: .02em; }
+    .brand-mark { display: grid; grid-template-columns: repeat(2, 7px); gap: 3px; width: 17px; }
+    .brand-mark i { display: block; aspect-ratio: 1; background: var(--orange); }
+    .brand-mark i:nth-child(2), .brand-mark i:nth-child(3) { background: var(--cyan); }
+    .brand-name { font-weight: 750; font-size: 15px; }
+    .brand-name b { color: var(--orange); font-weight: 750; }
+    .brand-sub { color: var(--faint); font: 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .api-link { color: var(--muted); font: 12px var(--mono); text-decoration: none; }
+    .api-link:hover { color: var(--ink); }
+    .availability { display: inline-flex; align-items: center; gap: 7px; font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; }
+    .availability::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(92, 201, 130, .12); }
+    .availability[data-state="pending"]::before { background: var(--orange); box-shadow: 0 0 0 3px rgba(244, 124, 40, .13); }
+    .availability[data-state="error"]::before { background: var(--red); box-shadow: 0 0 0 3px rgba(237, 106, 94, .13); }
+
+    main { padding: clamp(38px, 6vw, 74px) 0 42px; }
+    .eyebrow { margin: 0 0 12px; color: var(--cyan); font: 11px/1 var(--mono); letter-spacing: .13em; text-transform: uppercase; }
+    .lookup-head { display: flex; align-items: end; justify-content: space-between; gap: 28px; margin-bottom: 28px; }
+    h1 { margin: 0; font: 700 clamp(26px, 4.2vw, 46px)/1.05 var(--mono); letter-spacing: -.055em; overflow-wrap: anywhere; }
+    .lookup-state { max-width: 380px; margin: 0; color: var(--muted); font-size: 13px; text-align: right; }
+    .lookup-state[data-tone="error"] { color: #ffaaa2; }
+    .lookup-state[data-tone="ok"] { color: var(--green); }
+
+    .command-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: stretch; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: 0 15px 50px rgba(0, 0, 0, .18); }
+    .input-wrap { display: flex; align-items: center; min-width: 0; border-right: 1px solid var(--line); }
+    .prompt { padding-left: 15px; color: var(--orange); font: 17px/1 var(--mono); }
+    #ip-input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 16px 14px 16px 9px; color: var(--ink); background: transparent; font: 15px var(--mono); }
+    #ip-input::placeholder { color: var(--faint); }
+    .icon-button, .current-button { border: 0; background: transparent; color: var(--muted); transition: color .16s, background .16s; }
+    .icon-button { width: 56px; border-right: 1px solid var(--line); display: grid; place-items: center; }
+    .icon-button:hover { background: var(--orange); color: #20150d; }
+    .icon-button svg { width: 20px; height: 20px; }
+    .current-button { padding: 0 17px; font: 12px var(--mono); white-space: nowrap; }
+    .current-button:hover { color: var(--ink); background: var(--surface-raised); }
+
+    .result { position: relative; margin-top: 26px; border: 1px solid var(--line); border-radius: 6px; background: rgba(22, 28, 30, .92); overflow: hidden; }
+    .result::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--orange); }
+    .result-summary { display: flex; align-items: stretch; min-height: 102px; border-bottom: 1px solid var(--line); }
+    .summary-ip { min-width: min(42%, 430px); padding: 24px 25px 20px; border-right: 1px solid var(--line); }
+    .summary-ip strong { display: block; color: var(--ink); font: 600 clamp(21px, 3vw, 33px)/1.14 var(--mono); letter-spacing: -.045em; overflow-wrap: anywhere; }
+    .summary-meta { display: flex; flex: 1; align-items: center; gap: 0; }
+    .summary-metric { flex: 1; min-width: 110px; padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+    .summary-metric:last-child { border-right: 0; }
+    .label { display: block; margin-bottom: 6px; color: var(--faint); font: 10px/1.1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .metric-value { color: var(--ink); font: 600 14px/1.25 var(--mono); overflow-wrap: anywhere; }
+    .metric-value.accent { color: var(--orange); }
+
+    .detail-band { display: grid; grid-template-columns: 180px minmax(0, 1fr); border-bottom: 1px solid var(--line); }
+    .detail-band:last-of-type { border-bottom: 0; }
+    .band-title { padding: 22px 25px; border-right: 1px solid var(--line); color: var(--muted); font: 11px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .band-title::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 9px 1px 0; background: var(--cyan); }
+    .route .band-title::before { background: var(--orange); }
+    .allocation .band-title::before { background: var(--green); }
+    .data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .datum { padding: 17px 20px 16px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); min-width: 0; }
+    .datum:nth-child(3n) { border-right: 0; }
+    .datum:nth-last-child(-n + 3) { border-bottom: 0; }
+    .datum-value { color: var(--ink); font: 13px/1.35 var(--mono); overflow-wrap: anywhere; }
+    .datum-value.is-muted { color: var(--faint); }
+    .source-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 25px; border-top: 1px solid var(--line); background: rgba(10, 13, 14, .22); }
+    .source-list { display: flex; flex-wrap: wrap; gap: 7px 14px; }
+    .source { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .07em; }
+    .source::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--faint); }
+    .source[data-present="true"]::before { border-color: var(--green); background: var(--green); }
+    .source-note { color: var(--faint); font: 11px var(--mono); }
+
+    .empty { padding: 48px 25px; color: var(--muted); font: 13px var(--mono); text-align: center; }
+    .empty strong { display: block; margin-bottom: 6px; color: var(--ink); font-weight: 600; }
+    .skeleton { overflow: hidden; }
+    .skeleton .summary-ip strong, .skeleton .metric-value, .skeleton .datum-value { color: transparent; background: #2a3435; }
+    .skeleton .summary-ip strong { width: 65%; height: 38px; }
+    .skeleton .metric-value { width: 65px; height: 17px; }
+    .skeleton .datum-value { width: 78%; height: 16px; }
+    .copy-button { display: inline-grid; place-items: center; width: 29px; height: 29px; margin-left: 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: transparent; vertical-align: middle; }
+    .copy-button:hover { color: var(--orange); border-color: var(--orange-dim); }
+    .copy-button svg { width: 14px; height: 14px; }
+
+    footer { border-top: 1px solid var(--line); }
+    .footer-inner { display: flex; justify-content: space-between; gap: 18px; padding: 18px 0 25px; color: var(--faint); font: 11px var(--mono); }
+    .footer-inner a { color: var(--muted); text-decoration: none; }
+    .footer-inner a:hover { color: var(--orange); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 720px) {
+      .topbar-inner, main, .footer-inner { width: min(100% - 28px, 1120px); }
+      .brand-sub, .api-link { display: none; }
+      .lookup-head { display: block; margin-bottom: 21px; }
+      h1 { font-size: clamp(25px, 8.5vw, 36px); }
+      .lookup-state { margin-top: 10px; text-align: left; }
+      .command-strip { grid-template-columns: minmax(0, 1fr) auto; }
+      .input-wrap { border-right: 0; }
+      .current-button { grid-column: 1 / -1; min-height: 44px; border-top: 1px solid var(--line); padding: 0 15px; text-align: left; }
+      .icon-button { border-left: 1px solid var(--line); border-right: 0; }
+      .result-summary { display: block; }
+      .summary-ip { min-width: 0; border-right: 0; border-bottom: 1px solid var(--line); padding: 20px 18px; }
+      .summary-meta { display: grid; grid-template-columns: repeat(3, 1fr); }
+      .summary-metric { min-width: 0; padding: 15px 13px; }
+      .detail-band { display: block; }
+      .band-title { padding: 15px 18px; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+      .data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .datum { padding: 14px 15px; }
+      .datum:nth-child(3n) { border-right: 1px solid var(--line-soft); }
+      .datum:nth-child(2n) { border-right: 0; }
+      .datum:nth-last-child(-n + 3) { border-bottom: 1px solid var(--line-soft); }
+      .datum:nth-last-child(-n + 2) { border-bottom: 0; }
+      .source-row { align-items: flex-start; flex-direction: column; padding: 15px 18px; }
+      .footer-inner { display: block; line-height: 1.8; }
+      .footer-inner span, .footer-inner a { display: block; }
+    }
+    @media (max-width: 430px) {
+      .summary-meta { grid-template-columns: 1fr 1fr; }
+      .summary-metric:nth-child(2) { border-right: 0; }
+      .summary-metric:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line-soft); }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-field" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="MehrNet BGP home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-name">mehr<b>net</b> BGP</span>
+        <span class="brand-sub">IP intelligence</span>
+      </a>
+      <div class="topbar-right">
+        <a class="api-link" href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">api / health</a>
+        <span class="availability" id="availability" data-state="pending">checking</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <p class="eyebrow">Public route intelligence</p>
+    <section aria-labelledby="ip-heading">
+      <div class="lookup-head">
+        <h1 id="ip-heading">Resolving your address</h1>
+        <p class="lookup-state" id="lookup-state" aria-live="polite">Querying the network record for this connection.</p>
+      </div>
+      <form class="command-strip" id="lookup-form" novalidate>
+        <label class="input-wrap" for="ip-input">
+          <span class="prompt" aria-hidden="true">&gt;</span>
+          <span class="sr-only">IP address</span>
+          <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter IPv4 or IPv6 address" inputmode="text">
+        </label>
+        <button class="icon-button" type="submit" aria-label="Look up IP address" title="Look up IP address">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="current-button" type="button" id="current-button">Use current IP</button>
+      </form>
+    </section>
+
+    <section class="result skeleton" id="result" aria-label="IP lookup result" aria-busy="true">
+      <div class="result-summary">
+        <div class="summary-ip"><span class="label">Observed address</span><strong>&nbsp;</strong></div>
+        <div class="summary-meta">
+          <div class="summary-metric"><span class="label">Protocol</span><span class="metric-value">&nbsp;</span></div>
+          <div class="summary-metric"><span class="label">Registry</span><span class="metric-value">&nbsp;</span></div>
+          <div class="summary-metric"><span class="label">Country</span><span class="metric-value">&nbsp;</span></div>
+        </div>
+      </div>
+      <div class="detail-band route"><div class="band-title">Network route</div><div class="data-grid"></div></div>
+      <div class="detail-band allocation"><div class="band-title">Allocation</div><div class="data-grid"></div></div>
+      <div class="detail-band"><div class="band-title">Location</div><div class="data-grid"></div></div>
+    </section>
+  </main>
+
+  <footer><div class="footer-inner"><span>MehrNet BGP Database</span><a href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">Service status</a></div></footer>
+
+  <script>
+    (() => {
+      "use strict";
+      const API = "https://bgp-api.mehrnet.com";
+      const form = document.querySelector("#lookup-form");
+      const input = document.querySelector("#ip-input");
+      const heading = document.querySelector("#ip-heading");
+      const state = document.querySelector("#lookup-state");
+      const result = document.querySelector("#result");
+      const availability = document.querySelector("#availability");
+      const currentButton = document.querySelector("#current-button");
+      let controller;
+
+      const iconCopy = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
+      const empty = (value) => value === null || value === undefined || value === "" ? "-" : String(value);
+      const text = (value) => empty(value) === "-" ? "<span class=\"is-muted\">-</span>" : escapeHtml(value);
+      const escapeHtml = (value) => String(value).replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
+      const datum = (label, value) => '<div class="datum"><span class="label">' + label + '</span><div class="datum-value">' + text(value) + '</div></div>';
+
+      function isIP(value) {
+        if (!value || /\s/.test(value)) return false;
+        if (value.includes(":")) return /^[0-9a-fA-F:.]+$/.test(value) && value.split("::").length <= 2;
+        const blocks = value.split(".");
+        return blocks.length === 4 && blocks.every((block) => /^\d{1,3}$/.test(block) && Number(block) <= 255);
+      }
+
+      function setState(message, tone = "") {
+        state.textContent = message;
+        state.dataset.tone = tone;
+      }
+
+      function makeResult(data) {
+        const network = data.network || {};
+        const allocation = data.allocation || {};
+        const location = data.location || {};
+        const sources = data.sources || {};
+        const asns = Array.isArray(network.asns) && network.asns.length ? network.asns.join(", ") : network.asn;
+        const country = location.country_code || allocation.country_code || data.country_code;
+        const routeRange = network.start_ip && network.end_ip ? network.start_ip + " - " + network.end_ip : null;
+        const allocRange = allocation.start_ip && allocation.end_ip ? allocation.start_ip + " - " + allocation.end_ip : null;
+        const displayIP = empty(data.ip);
+        const copy = displayIP === "-" ? "" : '<button class="copy-button" type="button" data-copy="' + escapeHtml(displayIP) + '" aria-label="Copy IP address" title="Copy IP address">' + iconCopy + '</button>';
+
+        result.classList.remove("skeleton");
+        result.removeAttribute("aria-busy");
+        result.innerHTML = `
+          <div class="result-summary">
+            <div class="summary-ip"><span class="label">Observed address</span><strong>${escapeHtml(displayIP)}${copy}</strong></div>
+            <div class="summary-meta">
+              <div class="summary-metric"><span class="label">Protocol</span><span class="metric-value accent">IPv${empty(data.version)}</span></div>
+              <div class="summary-metric"><span class="label">Registry</span><span class="metric-value">${text(data.registry)}</span></div>
+              <div class="summary-metric"><span class="label">Country</span><span class="metric-value">${text(country)}</span></div>
+            </div>
+          </div>
+          <div class="detail-band route"><div class="band-title">Network route</div><div class="data-grid">
+            ${datum("CIDR", network.cidr)}${datum("ASN", asns)}${datum("AS number", network.as_number)}${datum("Network", network.name)}${datum("Route coverage", routeRange)}${datum("Route status", network.status)}
+          </div></div>
+          <div class="detail-band allocation"><div class="band-title">Allocation</div><div class="data-grid">
+            ${datum("Registry", allocation.registry || data.registry)}${datum("Allocation range", allocRange)}${datum("Country", allocation.country_code || allocation.country_raw)}${datum("Allocation name", allocation.name)}${datum("Allocation date", data.allocation_date || allocation.allocation_date)}${datum("Allocation status", data.allocation_status || allocation.status)}
+          </div></div>
+          <div class="detail-band"><div class="band-title">Location</div><div class="data-grid">
+            ${datum("Country", location.country_code)}${datum("Region", location.region)}${datum("City", location.city)}
+          </div></div>
+          <div class="source-row"><div class="source-list">
+            <span class="source" data-present="${Boolean(sources.allocation)}">allocation</span><span class="source" data-present="${Boolean(sources.route)}">route</span><span class="source" data-present="${Boolean(sources.geofeed)}">geofeed</span>
+          </div><span class="source-note">record availability</span></div>`;
+        const copyButton = result.querySelector("[data-copy]");
+        if (copyButton) copyButton.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(copyButton.dataset.copy); setState("Address copied to clipboard.", "ok"); }
+          catch { setState("Unable to copy this address.", "error"); }
+        });
+      }
+
+      function showError(message) {
+        result.classList.remove("skeleton");
+        result.removeAttribute("aria-busy");
+        result.innerHTML = '<div class="empty"><strong>Lookup unavailable</strong>' + escapeHtml(message) + '</div>';
+      }
+
+      async function lookup(kind, ip = "") {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        const endpoint = kind === "me" ? "/v1/me" : "/v1/ip/" + encodeURIComponent(ip);
+        heading.textContent = kind === "me" ? "Resolving your address" : ip;
+        setState(kind === "me" ? "Querying the network record for this connection." : "Querying network records for " + ip + ".");
+        availability.dataset.state = "pending";
+        availability.textContent = "checking";
+        result.classList.add("skeleton");
+        result.setAttribute("aria-busy", "true");
+        try {
+          const timeout = setTimeout(() => controller.abort(), 10000);
+          const response = await fetch(API + endpoint, { signal: controller.signal, headers: { Accept: "application/json" } });
+          clearTimeout(timeout);
+          if (!response.ok) throw new Error(response.status === 404 ? "No record was found for this address." : "The API returned HTTP " + response.status + ".");
+          const data = await response.json();
+          if (!data || !data.ip) throw new Error("The API response did not contain an IP address.");
+          input.value = data.ip;
+          heading.textContent = data.ip;
+          setState("Record resolved successfully.", "ok");
+          availability.dataset.state = "ok";
+          availability.textContent = "online";
+          makeResult(data);
+        } catch (error) {
+          if (error.name === "AbortError") return;
+          const message = error.message || "The lookup could not be completed.";
+          setState(message, "error");
+          availability.dataset.state = "error";
+          availability.textContent = "offline";
+          showError(message);
+        }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const ip = input.value.trim();
+        if (!isIP(ip)) {
+          setState("Enter a valid IPv4 or IPv6 address.", "error");
+          input.focus();
+          return;
+        }
+        lookup("ip", ip);
+      });
+      currentButton.addEventListener("click", () => lookup("me"));
+      lookup("me");
+    })();
+  </script>
+</body>
+</html>

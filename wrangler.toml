@@ -1,0 +1,11 @@
+name = "mehrnet-bgp"
+compatibility_date = "2026-07-26"
+workers_dev = false
+
+[assets]
+directory = "./public"
+not_found_handling = "single-page-application"
+
+[[routes]]
+pattern = "bgp.mehrnet.com"
+custom_domain = true
