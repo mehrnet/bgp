@@ -314,33 +314,6 @@
       </section>`;
   }
 
-  function enrichmentPanels(enrichment) {
-    if (!enrichment) return "";
-    const panels = [];
-    if (enrichment.rdap) {
-      panels.push(recordPanel("RDAP registration", [
-        { label: "Name", value: enrichment.rdap.name },
-        { label: "Handle", value: enrichment.rdap.handle },
-        { label: "Type", value: enrichment.rdap.type },
-        { label: "Range", value: addressRange(enrichment.rdap.start_ip, enrichment.rdap.end_ip) },
-        { label: "Country", value: enrichment.rdap.country_code },
-        { label: "Created", value: enrichment.rdap.created },
-        { label: "Last changed", value: enrichment.rdap.last_changed },
-        { label: "Status", value: Array.isArray(enrichment.rdap.status) ? enrichment.rdap.status.join(", ") : "" }
-      ], "registry"));
-    }
-    if (enrichment.routing_status) {
-      panels.push(recordPanel("Routing status", [
-        { label: "Origins", value: Array.isArray(enrichment.routing_status.origins) ? enrichment.routing_status.origins.join(", ") : "" },
-        { label: "First seen", value: enrichment.routing_status.first_seen },
-        { label: "Last seen", value: enrichment.routing_status.last_seen },
-        { label: "Holder", value: enrichment.routing_status.holder },
-        { label: "Announced", value: enrichment.routing_status.announced === true ? "Yes" : enrichment.routing_status.announced === false ? "No" : "" }
-      ], "route"));
-    }
-    return panels.join("");
-  }
-
   function paginationControl(endpoint, cursor) {
     if (!hasValue(cursor)) return "";
     const url = new URL(endpoint, API);
@@ -385,7 +358,6 @@
       <div class="record-grid">
         ${recordPanel("Allocation", allocationFields, "registry")}
         ${objectList("Registered route objects", routes.items, "route", "route")}
-        ${enrichmentPanels(data.enrichment)}
       </div>
       ${paginationControl(endpoint, routes.next_cursor)}`;
     bindResultControls();
@@ -443,7 +415,6 @@
       <div class="record-grid">
         ${recordPanel("Aut-num record", autnumFields, "registry")}
         ${objectList("Registered route objects", routes.items, "route", "route")}
-        ${enrichmentPanels(data.enrichment)}
       </div>
       ${paginationControl(endpoint, routes.next_cursor)}`;
     bindResultControls();
