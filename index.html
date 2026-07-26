@@ -3,63 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101516">
+  <meta name="theme-color" content="#0f1417">
   <meta name="description" content="MehrNet BGP public IP and route intelligence lookup.">
-  <title>BGP Lookup | MehrNet</title>
-  <link rel="stylesheet" href="style.css?v=20260726-2309">
+  <title>MehrNet BGP</title>
+  <link rel="stylesheet" href="style.css?v=20260726-2330">
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
+  <header class="nav">
+    <div class="nav-inner">
       <a class="brand" href="./" aria-label="MehrNet BGP home">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-        <span class="brand-name">mehr<b>net</b> BGP</span>
-        <span class="brand-sub">IP intelligence</span>
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <span class="brand-name">mehr<span>bgp</span></span>
+          <span class="brand-byline">by mehrnet</span>
+        </span>
       </a>
-      <div class="topbar-right">
-        <a class="api-link" href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">api / health</a>
-        <span class="availability" id="availability" data-state="pending">checking</span>
+
+      <div class="nav-actions">
+        <a class="api-link" href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">
+          API
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+        <span class="service-status" id="service-status" data-state="pending">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="service-status-text">Checking API</span>
+        </span>
       </div>
     </div>
   </header>
 
-  <main>
-    <section class="lookup" aria-labelledby="ip-heading">
-      <p class="eyebrow">Public route intelligence</p>
-      <div class="lookup-head">
-        <h1 id="ip-heading">Resolving your address</h1>
-        <p class="lookup-state" id="lookup-state" aria-live="polite">Querying the network record for this connection.</p>
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <p class="kicker">Network intelligence</p>
+        <h1>IP address lookup</h1>
       </div>
-      <form class="command-strip" id="lookup-form" novalidate>
-        <label class="input-wrap" for="ip-input">
-          <span class="prompt" aria-hidden="true">&gt;</span>
-          <span class="sr-only">IP address</span>
-          <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter IPv4 or IPv6 address" inputmode="text">
+      <p class="request-status" id="request-status" aria-live="polite">Resolving your current connection</p>
+    </header>
+
+    <section class="lookup-tools" aria-label="IP lookup">
+      <form class="lookup-form" id="lookup-form" novalidate>
+        <label class="search-field" for="ip-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <span class="sr-only">IPv4 or IPv6 address</span>
+          <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IPv4 or IPv6 address">
         </label>
-        <button class="icon-button" type="submit" aria-label="Look up IP address" title="Look up IP address">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        <button class="primary-button" type="submit">
+          <span>Lookup</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
-        <button class="current-button" type="button" id="current-button">Use current IP</button>
+        <button class="secondary-button" type="button" id="current-button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+          <span>My IP</span>
+        </button>
       </form>
-      <button class="ipv6-connection" id="connection-ipv6" type="button" data-state="checking" disabled hidden>
-        <span><span class="connection-family">IPv6 connection</span><span class="connection-ip">Checking address</span></span>
-        <span class="connection-status">checking</span>
+
+      <button class="ipv6-button" id="ipv6-button" type="button" hidden>
+        <span class="ipv6-label">
+          <span class="protocol-mark">IPv6</span>
+          <span id="ipv6-address"></span>
+        </span>
+        <span class="ipv6-action">
+          View IPv6
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </span>
       </button>
     </section>
 
-    <section class="result skeleton" id="result" aria-label="IP lookup result" aria-busy="true">
-      <div class="result-summary">
-        <div class="summary-ip"><span class="label">Observed address</span><strong>&nbsp;</strong></div>
-        <div class="summary-meta">
-          <div class="summary-metric"><span class="label">Protocol</span><span class="metric-value">&nbsp;</span></div>
-          <div class="summary-metric"><span class="label">Registry</span><span class="metric-value">&nbsp;</span></div>
-          <div class="summary-metric"><span class="label">Country</span><span class="metric-value">&nbsp;</span></div>
-        </div>
+    <section id="result" class="result" aria-label="IP lookup result" aria-busy="true">
+      <div class="loading-panel">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Loading network record</span>
       </div>
     </section>
   </main>
 
-  <footer><div class="footer-inner"><span>MehrNet BGP Database</span><a href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">Service status</a></div></footer>
-  <script src="app.js?v=20260726-2309"></script>
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>MehrNet BGP Database</span>
+      <span>Global IPv4 &amp; IPv6 routing data</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js?v=20260726-2330"></script>
 </body>
 </html>
