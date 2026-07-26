@@ -90,13 +90,10 @@ a:focus-visible {
   text-decoration: none;
 }
 
-.brand-dot {
-  width: 10px;
-  height: 10px;
+.brand-mark {
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.65);
 }
 
 .brand-copy {
