@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>MehrNet BGP</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.6">
+    <path stroke="#67e8f9" d="m5 5 8 8m-5 0h5V8"/>
+    <path stroke="#f97316" d="m19 13 8-8m-6 0h6v6M13 19l-8 8m0-6v6h6"/>
+    <path stroke="#67e8f9" d="m27 27-8-8m0 6v-6h6"/>
+  </g>
+</svg>
