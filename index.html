@@ -7,23 +7,27 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20260727-0330">
   <meta name="description" content="MehrNet BGP IP, CIDR, range, and ASN intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260727-0330">
+  <link rel="stylesheet" href="style.css?v=20260727-0410">
 </head>
 <body>
   <header class="nav">
     <div class="nav-inner">
-      <a class="brand" href="./" aria-label="MehrNet BGP home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="icons.svg?v=20260727-0310#icon-bgp-mark"></use></svg>
+      <a class="brand" href="#home" aria-label="MehrNet BGP home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-bgp-mark"></use></svg>
         <span class="brand-copy">
           <span class="brand-name">mehr<span>bgp</span></span>
           <span class="brand-byline">by mehrnet</span>
         </span>
       </a>
-
+      <a class="api-link" href="#api">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-book-open"></use></svg>
+        <span>API documentation</span>
+      </a>
     </div>
   </header>
 
   <main class="page">
+    <div id="home-view">
     <header class="page-header">
       <p class="kicker">Network intelligence</p>
       <h1>Network lookup</h1>
@@ -65,9 +69,77 @@
         <span>Loading network record</span>
       </div>
     </section>
+    </div>
+
+    <section class="api-view" id="api-view" aria-labelledby="api-title" hidden>
+      <header class="page-header api-header">
+        <p class="kicker">Public API</p>
+        <h1 id="api-title">Build with Mehr BGP</h1>
+        <p>JSON over HTTPS, no API key required. Responses are served from the daily materialized BGP dataset.</p>
+      </header>
+
+      <section class="api-overview" aria-label="API base URL">
+        <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-globe"></use></svg>Base URL</span>
+        <code>https://bgp-api.mehrnet.com</code>
+        <span>All endpoints return JSON. Set <code>Accept: application/json</code> when your client does not do so by default.</span>
+      </section>
+
+      <section class="api-section" aria-labelledby="endpoints-title">
+        <div class="api-section-heading">
+          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-route"></use></svg>Endpoints</span>
+          <h2 id="endpoints-title">Lookup resources</h2>
+        </div>
+        <div class="api-endpoints">
+          <div><code>GET /v1/me</code><span>Current connection address</span></div>
+          <div><code>GET /v1/ip/{address}</code><span>IPv4 or IPv6 address</span></div>
+          <div><code>GET /v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></div>
+          <div><code>GET /v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations</span></div>
+          <div><code>GET /v1/range?...&amp;kind=routes</code><span>Overlapping registered routes</span></div>
+          <div><code>GET /v1/asn/{asn}</code><span>Aut-num record and routes</span></div>
+          <div><code>GET /v1/search?q={query}</code><span>Normalize an IP, CIDR, or ASN</span></div>
+          <div><code>GET /v1/health</code><span>Service health</span></div>
+        </div>
+        <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available.</p>
+      </section>
+
+      <section class="api-section" aria-labelledby="examples-title">
+        <div class="api-section-heading">
+          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-book-open"></use></svg>Examples</span>
+          <h2 id="examples-title">Request an IP record</h2>
+        </div>
+        <div class="api-examples">
+          <article>
+            <h3>Curl</h3>
+            <pre><code>curl -sS https://bgp-api.mehrnet.com/v1/ip/1.1.1.1</code></pre>
+          </article>
+          <article>
+            <h3>JavaScript</h3>
+            <pre><code>const response = await fetch(
+  "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"
+);
+const data = await response.json();</code></pre>
+          </article>
+          <article>
+            <h3>PHP</h3>
+            <pre><code>$curl = curl_init("https://bgp-api.mehrnet.com/v1/ip/1.1.1.1");
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+$data = json_decode(curl_exec($curl), true);</code></pre>
+          </article>
+          <article>
+            <h3>Python</h3>
+            <pre><code>from urllib.request import urlopen
+import json
+
+data = json.load(urlopen(
+    "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"
+))</code></pre>
+          </article>
+        </div>
+      </section>
+    </section>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=20260727-0200"></script>
+  <script src="app.js?v=20260727-0410"></script>
 </body>
 </html>

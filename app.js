@@ -2,7 +2,10 @@
   "use strict";
 
   const API = "https://bgp-api.mehrnet.com";
-  const ICON_SPRITE = "icons.svg?v=20260727-0010";
+  const ICON_SPRITE = "icons.svg?v=20260727-0400";
+  const homeView = document.querySelector("#home-view");
+  const apiView = document.querySelector("#api-view");
+  const apiLink = document.querySelector(".api-link");
   const form = document.querySelector("#lookup-form");
   const input = document.querySelector("#ip-input");
   const result = document.querySelector("#result");
@@ -14,6 +17,7 @@
 
   let activeLookup;
   let toastTimer;
+  let homeInitialized = false;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (character) => ({
@@ -109,6 +113,29 @@
     toastTimer = window.setTimeout(() => {
       toast.hidden = true;
     }, 2200);
+  }
+
+  function renderRoute() {
+    const apiRoute = window.location.hash.toLowerCase() === "#api";
+    homeView.hidden = apiRoute;
+    apiView.hidden = !apiRoute;
+    document.title = apiRoute ? "MehrNet BGP API" : "MehrNet BGP";
+
+    if (apiRoute) {
+      if (activeLookup) {
+        activeLookup.abort();
+        activeLookup = null;
+      }
+      apiLink.setAttribute("aria-current", "page");
+      return;
+    }
+
+    apiLink.removeAttribute("aria-current");
+    if (!homeInitialized) {
+      homeInitialized = true;
+      lookup("me");
+      detectIPv6();
+    }
   }
 
   function valueOrUnavailable(value, leadingIcon = "") {
@@ -534,6 +561,9 @@
   currentButton.addEventListener("click", () => lookup("me"));
   ipv6Button.addEventListener("click", () => lookup("ip", ipv6Button.dataset.ip));
 
-  lookup("me");
-  detectIPv6();
+  window.addEventListener("hashchange", renderRoute);
+  if (window.location.hash !== "#home" && window.location.hash !== "#api") {
+    window.history.replaceState(null, "", "#home");
+  }
+  renderRoute();
 })();
