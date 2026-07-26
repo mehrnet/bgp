@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f1417">
   <meta name="description" content="MehrNet BGP public IP and route intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260726-2330">
+  <link rel="stylesheet" href="style.css?v=20260726-2355">
 </head>
 <body>
   <header class="nav">
@@ -19,16 +19,6 @@
         </span>
       </a>
 
-      <div class="nav-actions">
-        <a class="api-link" href="https://bgp-api.mehrnet.com/v1/health" target="_blank" rel="noopener">
-          API
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
-        </a>
-        <span class="service-status" id="service-status" data-state="pending">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="service-status-text">Checking API</span>
-        </span>
-      </div>
     </div>
   </header>
 
@@ -44,16 +34,16 @@
     <section class="lookup-tools" aria-label="IP lookup">
       <form class="lookup-form" id="lookup-form" novalidate>
         <label class="search-field" for="ip-input">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-search"></use></svg>
           <span class="sr-only">IPv4 or IPv6 address</span>
           <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IPv4 or IPv6 address">
         </label>
         <button class="primary-button" type="submit">
           <span>Lookup</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-arrow-right"></use></svg>
         </button>
         <button class="secondary-button" type="button" id="current-button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-target"></use></svg>
           <span>My IP</span>
         </button>
       </form>
@@ -65,7 +55,7 @@
         </span>
         <span class="ipv6-action">
           View IPv6
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260726-2355#icon-arrow-right"></use></svg>
         </span>
       </button>
     </section>
@@ -78,14 +68,7 @@
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <span>MehrNet BGP Database</span>
-      <span>Global IPv4 &amp; IPv6 routing data</span>
-    </div>
-  </footer>
-
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=20260726-2330"></script>
+  <script src="app.js?v=20260726-2355"></script>
 </body>
 </html>

@@ -2,12 +2,11 @@
   "use strict";
 
   const API = "https://bgp-api.mehrnet.com";
+  const ICON_SPRITE = "icons.svg?v=20260726-2355";
   const form = document.querySelector("#lookup-form");
   const input = document.querySelector("#ip-input");
   const result = document.querySelector("#result");
   const requestStatus = document.querySelector("#request-status");
-  const serviceStatus = document.querySelector("#service-status");
-  const serviceStatusText = document.querySelector("#service-status-text");
   const currentButton = document.querySelector("#current-button");
   const ipv6Button = document.querySelector("#ipv6-button");
   const ipv6Address = document.querySelector("#ipv6-address");
@@ -15,11 +14,6 @@
 
   let activeLookup;
   let toastTimer;
-
-  const icons = {
-    copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
-    error: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>'
-  };
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (character) => ({
@@ -33,6 +27,17 @@
 
   function hasValue(value) {
     return value !== null && value !== undefined && String(value).trim() !== "";
+  }
+
+  function icon(name, className = "") {
+    const classes = className ? ` class="${className}"` : "";
+    return `<svg${classes} viewBox="0 0 24 24" aria-hidden="true"><use href="${ICON_SPRITE}#icon-${name}"></use></svg>`;
+  }
+
+  function countryFlag(countryCode) {
+    const code = String(countryCode || "").trim().toLowerCase();
+    if (!/^[a-z]{2}$/.test(code)) return "";
+    return `<svg class="country-flag" viewBox="0 0 640 480" aria-hidden="true"><use href="${ICON_SPRITE}#flag-${code}"></use></svg>`;
   }
 
   function isIPv4(value) {
@@ -106,15 +111,16 @@
     }, 2200);
   }
 
-  function valueOrUnavailable(value) {
+  function valueOrUnavailable(value, leadingIcon = "") {
     if (!hasValue(value)) {
       return '<span class="quick-value muted">Not available</span>';
     }
-    return `<span class="quick-value">${escapeHtml(value)}</span>`;
+    const className = leadingIcon ? "quick-value location-value" : "quick-value";
+    return `<span class="${className}">${leadingIcon}${escapeHtml(value)}</span>`;
   }
 
-  function quickFact(label, value) {
-    return `<div class="quick-fact"><span class="record-label">${escapeHtml(label)}</span>${valueOrUnavailable(value)}</div>`;
+  function quickFact(label, value, leadingIcon = "") {
+    return `<div class="quick-fact"><span class="record-label">${escapeHtml(label)}</span>${valueOrUnavailable(value, leadingIcon)}</div>`;
   }
 
   function recordRows(fields) {
@@ -175,7 +181,7 @@
     result.removeAttribute("aria-busy");
     result.innerHTML = `
       <div class="error-panel">
-        ${icons.error}
+        ${icon("alert")}
         <strong>Lookup unavailable</strong>
         <p>${escapeHtml(message)}</p>
       </div>`;
@@ -195,6 +201,7 @@
     const resultLabel = kind === "me" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
     const asSubtitle = [asn, network.cidr].filter(hasValue).join(" · ");
+    const flag = countryFlag(country);
 
     const routeFields = [
       { label: "Prefix", value: network.cidr },
@@ -229,13 +236,13 @@
           <div class="address-line">
             <h2>${escapeHtml(data.ip)}</h2>
             <button class="copy-button" type="button" data-copy="${escapeHtml(data.ip)}" aria-label="Copy IP address" title="Copy IP address">
-              ${icons.copy}
+              ${icon("copy")}
             </button>
           </div>
           <div class="identity-meta">
             ${hasValue(protocol) ? `<span class="meta-chip accent">${escapeHtml(protocol)}</span>` : ""}
             ${hasValue(registry) ? `<span class="meta-chip">${escapeHtml(String(registry).toUpperCase())}</span>` : ""}
-            ${hasValue(country) ? `<span class="meta-chip">${escapeHtml(String(country).toUpperCase())}</span>` : ""}
+            ${hasValue(country) ? `<span class="meta-chip with-flag">${flag}${escapeHtml(String(country).toUpperCase())}</span>` : ""}
             ${hasValue(allocationStatus) ? `<span class="meta-chip">${escapeHtml(allocationStatus)}</span>` : ""}
           </div>
         </div>
@@ -250,7 +257,7 @@
         ${quickFact("Origin ASN", asn)}
         ${quickFact("Route prefix", network.cidr)}
         ${quickFact("Registry", hasValue(registry) ? String(registry).toUpperCase() : "")}
-        ${quickFact("Location", locationName)}
+        ${quickFact("Location", locationName, flag)}
       </section>
 
       <div class="record-grid">
@@ -312,20 +319,6 @@
     }
   }
 
-  async function checkHealth() {
-    try {
-      const response = await fetch(`${API}/v1/health`, {
-        headers: { Accept: "application/json" }
-      });
-      if (!response.ok) throw new Error("API unavailable");
-      serviceStatus.dataset.state = "online";
-      serviceStatusText.textContent = "API online";
-    } catch {
-      serviceStatus.dataset.state = "offline";
-      serviceStatusText.textContent = "API offline";
-    }
-  }
-
   async function detectIPv6() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 6000);
@@ -363,6 +356,5 @@
   ipv6Button.addEventListener("click", () => lookup("ip", ipv6Button.dataset.ip));
 
   lookup("me");
-  checkHealth();
   detectIPv6();
 })();
