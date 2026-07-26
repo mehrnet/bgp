@@ -6,6 +6,7 @@
   const homeView = document.querySelector("#home-view");
   const apiView = document.querySelector("#api-view");
   const apiLink = document.querySelector(".api-link");
+  const codeCopyTemplate = document.querySelector("#code-copy-template");
   const form = document.querySelector("#lookup-form");
   const input = document.querySelector("#ip-input");
   const result = document.querySelector("#result");
@@ -136,6 +137,35 @@
       lookup("me");
       detectIPv6();
     }
+  }
+
+  function bindCodeCopyButtons() {
+    document.querySelectorAll(".api-example").forEach((example) => {
+      const code = example.querySelector(".api-code code");
+      const actions = example.querySelector(".api-code-actions");
+      const button = codeCopyTemplate.content.firstElementChild.cloneNode(true);
+      const label = button.querySelector("span");
+      const language = example.dataset.language;
+      let resetTimer;
+
+      button.setAttribute("aria-label", `Copy ${language} example`);
+      button.addEventListener("click", async () => {
+        window.clearTimeout(resetTimer);
+        try {
+          await navigator.clipboard.writeText(code.textContent.trim());
+          label.textContent = "Copied";
+          button.dataset.copyState = "copied";
+        } catch {
+          label.textContent = "Copy failed";
+          button.dataset.copyState = "failed";
+        }
+        resetTimer = window.setTimeout(() => {
+          label.textContent = "Copy";
+          delete button.dataset.copyState;
+        }, 1800);
+      });
+      actions.append(button);
+    });
   }
 
   function valueOrUnavailable(value, leadingIcon = "") {
@@ -561,6 +591,7 @@
   currentButton.addEventListener("click", () => lookup("me"));
   ipv6Button.addEventListener("click", () => lookup("ip", ipv6Button.dataset.ip));
 
+  bindCodeCopyButtons();
   window.addEventListener("hashchange", renderRoute);
   if (window.location.hash !== "#home" && window.location.hash !== "#api") {
     window.history.replaceState(null, "", "#home");

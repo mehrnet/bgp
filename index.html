@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20260727-0330">
   <meta name="description" content="MehrNet BGP IP, CIDR, range, and ASN intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260727-0410">
+  <link rel="stylesheet" href="style.css?v=20260727-0420">
 </head>
 <body>
   <header class="nav">
@@ -108,30 +108,54 @@
           <h2 id="examples-title">Request an IP record</h2>
         </div>
         <div class="api-examples">
-          <article>
-            <h3>Curl</h3>
-            <pre><code>curl -sS https://bgp-api.mehrnet.com/v1/ip/1.1.1.1</code></pre>
+          <article class="api-example" data-language="Curl">
+            <header class="api-example-header">
+              <div>
+                <span class="api-example-kind">Shell</span>
+                <h3>Curl</h3>
+              </div>
+              <div class="api-code-actions"></div>
+            </header>
+            <pre class="api-code"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token url">https://bgp-api.mehrnet.com/v1/ip/1.1.1.1</span></code></pre>
           </article>
-          <article>
-            <h3>JavaScript</h3>
-            <pre><code>const response = await fetch(
-  "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"
+          <article class="api-example" data-language="JavaScript">
+            <header class="api-example-header">
+              <div>
+                <span class="api-example-kind">Browser or Node.js</span>
+                <h3>JavaScript</h3>
+              </div>
+              <div class="api-code-actions"></div>
+            </header>
+            <pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(
+  <span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>
 );
-const data = await response.json();</code></pre>
+<span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre>
           </article>
-          <article>
-            <h3>PHP</h3>
-            <pre><code>$curl = curl_init("https://bgp-api.mehrnet.com/v1/ip/1.1.1.1");
-curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-$data = json_decode(curl_exec($curl), true);</code></pre>
+          <article class="api-example" data-language="PHP">
+            <header class="api-example-header">
+              <div>
+                <span class="api-example-kind">PHP cURL</span>
+                <h3>PHP</h3>
+              </div>
+              <div class="api-code-actions"></div>
+            </header>
+            <pre class="api-code"><code><span class="token variable">$curl</span> = <span class="token function">curl_init</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>);
+<span class="token function">curl_setopt</span>(<span class="token variable">$curl</span>, <span class="token constant">CURLOPT_RETURNTRANSFER</span>, <span class="token boolean">true</span>);
+<span class="token variable">$data</span> = <span class="token function">json_decode</span>(<span class="token function">curl_exec</span>(<span class="token variable">$curl</span>), <span class="token boolean">true</span>);</code></pre>
           </article>
-          <article>
-            <h3>Python</h3>
-            <pre><code>from urllib.request import urlopen
-import json
+          <article class="api-example" data-language="Python">
+            <header class="api-example-header">
+              <div>
+                <span class="api-example-kind">Standard library</span>
+                <h3>Python</h3>
+              </div>
+              <div class="api-code-actions"></div>
+            </header>
+            <pre class="api-code"><code><span class="token keyword">from</span> urllib.request <span class="token keyword">import</span> urlopen
+<span class="token keyword">import</span> json
 
-data = json.load(urlopen(
-    "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"
+data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(
+    <span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>
 ))</code></pre>
           </article>
         </div>
@@ -140,6 +164,12 @@ data = json.load(urlopen(
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-  <script src="app.js?v=20260727-0410"></script>
+  <template id="code-copy-template">
+    <button class="code-copy-button" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0400#icon-copy"></use></svg>
+      <span>Copy</span>
+    </button>
+  </template>
+  <script src="app.js?v=20260727-0420"></script>
 </body>
 </html>
