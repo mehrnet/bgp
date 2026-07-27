@@ -751,6 +751,10 @@ a:focus-visible {
   color: #f9a8d4;
 }
 
+.token.type {
+  color: #93c5fd;
+}
+
 .token.constant,
 .token.number {
   color: #fcd34d;
