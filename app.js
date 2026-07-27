@@ -173,6 +173,9 @@
     const hash = window.location.hash || "#my-ip";
     if (hash === "#" || hash === "#home") return { redirect: "#my-ip" };
     if (hash === "#api") return { page: "api" };
+    if (/^#api-(?:me|ip|prefix|range|asn|search)$/.test(hash)) {
+      return { page: "api", anchor: hash.slice(1) };
+    }
     if (hash === "#my-ip") return { page: "lookup", kind: "me", endpoint: "/v1/me", inputValue: "" };
 
     if (hash.startsWith("#ip/")) {
@@ -236,6 +239,7 @@
     const apiRoute = route.page === "api";
     homeView.hidden = apiRoute;
     apiView.hidden = !apiRoute;
+    document.body.classList.toggle("api-active", apiRoute);
     document.title = apiRoute ? "MehrNet BGP API" : "MehrNet BGP";
 
     if (apiRoute) {
@@ -244,6 +248,11 @@
         activeLookup = null;
       }
       apiLink.setAttribute("aria-current", "page");
+      if (route.anchor) {
+        window.requestAnimationFrame(() => {
+          document.getElementById(route.anchor)?.scrollIntoView({ block: "start" });
+        });
+      }
       return;
     }
 
@@ -293,7 +302,7 @@
     );
     const activeLanguage = availableLanguages.has(language) ? language : "curl";
     document.querySelectorAll("[data-language-tab]").forEach((button) => {
-      button.setAttribute("aria-selected", String(button.dataset.languageTab === activeLanguage));
+      button.setAttribute("aria-pressed", String(button.dataset.languageTab === activeLanguage));
     });
     document.querySelectorAll("[data-language-panel]").forEach((panel) => {
       panel.hidden = panel.dataset.languagePanel !== activeLanguage;

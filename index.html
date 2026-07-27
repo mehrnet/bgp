@@ -73,15 +73,15 @@
 
     <section class="api-view" id="api-view" aria-labelledby="api-title" hidden>
       <header class="page-header api-header">
-        <p class="kicker">Public API</p>
-        <h1 id="api-title">Build with Mehr BGP</h1>
-        <p>JSON over HTTPS, no API key required. Responses are served from the daily materialized BGP dataset.</p>
+        <p class="kicker">Public API / field manual</p>
+        <h1 id="api-title">Trace the network.</h1>
+        <p>One public API for address, prefix, range, and ASN intelligence. JSON over HTTPS, built from MehrNet's daily routing dataset.</p>
       </header>
 
       <section class="api-overview" aria-label="API base URL">
         <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-globe"></use></svg>Base URL</span>
         <code>https://bgp-api.mehrnet.com</code>
-        <span>All endpoints return JSON. Lookup responses include <code>meta.dataset</code>; health also reports the running binary build.</span>
+        <span>No key, no client library. Lookup responses include <code>meta.dataset</code> so every answer can be traced to its source build.</span>
         <a class="openapi-link" href="/openapi.json">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>
           <span>OpenAPI JSON</span>
@@ -93,16 +93,14 @@
           <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-terminal"></use></svg>Endpoints</span>
           <h2 id="endpoints-title">Lookup resources</h2>
         </div>
-        <div class="api-endpoints">
-          <div><code>GET /v1/me</code><span>Current connection address</span></div>
-          <div><code>GET /v1/ip/{address}</code><span>IPv4 or IPv6 address</span></div>
-          <div><code>GET /v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></div>
-          <div><code>GET /v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations</span></div>
-          <div><code>GET /v1/range?...&amp;kind=routes</code><span>Overlapping registered routes</span></div>
-          <div><code>GET /v1/asn/{asn}</code><span>Aut-num record and routes</span></div>
-          <div><code>GET /v1/search?q={query}</code><span>Normalize an IP, CIDR, or ASN</span></div>
-          <div><code>GET /v1/health</code><span>Service health and active dataset metadata</span></div>
-        </div>
+        <nav class="api-endpoints" aria-label="API endpoint directory">
+          <a href="#api-me"><span class="endpoint-method">GET</span><code>/v1/me</code><span>Current connection address</span></a>
+          <a href="#api-ip"><span class="endpoint-method">GET</span><code>/v1/ip/{address}</code><span>IPv4 or IPv6 address</span></a>
+          <a href="#api-prefix"><span class="endpoint-method">GET</span><code>/v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></a>
+          <a href="#api-range"><span class="endpoint-method">GET</span><code>/v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations or routes</span></a>
+          <a href="#api-asn"><span class="endpoint-method">GET</span><code>/v1/asn/{asn}</code><span>Aut-num record and registered routes</span></a>
+          <a href="#api-search"><span class="endpoint-method">GET</span><code>/v1/search?q={query}</code><span>Normalize an IP, CIDR, or ASN</span></a>
+        </nav>
         <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. IP and current-connection lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
       </section>
 
@@ -113,17 +111,18 @@
         </div>
         <div class="api-language-bar">
           <span>Example language</span>
-          <div class="language-tabs" role="tablist" aria-label="API example language">
-            <button class="language-tab" type="button" role="tab" aria-selected="true" data-language-tab="curl"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-curl"></use></svg><span>cURL</span></button>
-            <button class="language-tab" type="button" role="tab" aria-selected="false" data-language-tab="javascript"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-javascript"></use></svg><span>JavaScript</span></button>
-            <button class="language-tab" type="button" role="tab" aria-selected="false" data-language-tab="php"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-php"></use></svg><span>PHP</span></button>
-            <button class="language-tab" type="button" role="tab" aria-selected="false" data-language-tab="python"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-python"></use></svg><span>Python</span></button>
-            <button class="language-tab" type="button" role="tab" aria-selected="false" data-language-tab="go"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-go"></use></svg><span>Go</span></button>
+          <div class="language-tabs" role="group" aria-label="API example language">
+            <button class="language-tab" type="button" aria-pressed="true" data-language-tab="curl"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-curl"></use></svg><span>cURL</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="javascript"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-javascript"></use></svg><span>JavaScript</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="php"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-php"></use></svg><span>PHP</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="python"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-python"></use></svg><span>Python</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="go"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-go"></use></svg><span>Go</span></button>
           </div>
         </div>
         <div class="api-examples">
-          <article class="api-example lookup-example" id="example-me">
+          <article class="api-example lookup-example" id="api-me">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>Current connection</h3>
                 <p>Return the address seen by the API and its BGP, allocation, and geofeed record.</p>
@@ -155,8 +154,9 @@ var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
           </article>
 
-          <article class="api-example lookup-example" id="example-ip">
+          <article class="api-example lookup-example" id="api-ip">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>IP address lookup</h3>
                 <p>Resolve one IPv4 or IPv6 address into its best matching route, allocation, ASN, and location.</p>
@@ -189,8 +189,9 @@ var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
           </article>
 
-          <article class="api-example lookup-example" id="example-prefix">
+          <article class="api-example lookup-example" id="api-prefix">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>CIDR prefix lookup</h3>
                 <p>Inspect the allocation covering a prefix and the registered route objects that overlap it.</p>
@@ -227,8 +228,9 @@ var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
           </article>
 
-          <article class="api-example lookup-example" id="example-range">
+          <article class="api-example lookup-example" id="api-range">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>Range lookup</h3>
                 <p>Find allocations or route objects that overlap a start and end address.</p>
@@ -271,8 +273,9 @@ var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
           </article>
 
-          <article class="api-example lookup-example" id="example-asn">
+          <article class="api-example lookup-example" id="api-asn">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>ASN lookup</h3>
                 <p>Fetch an autonomous system record with its registered route objects.</p>
@@ -304,8 +307,9 @@ var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
           </article>
 
-          <article class="api-example lookup-example" id="example-search">
+          <article class="api-example lookup-example" id="api-search">
             <header class="api-example-header">
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>Search lookup</h3>
                 <p>Let the API normalize a user-entered IP, CIDR, or AS number and return the matching resource.</p>
@@ -357,7 +361,7 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             <div><code>sources</code><span>Booleans showing whether allocation, route, and geofeed data contributed to the result.</span></div>
             <div><code>details</code><span>Only present with <code>?details=full</code>; contains matched candidate records.</span></div>
           </div>
-          <div class="api-code-panel response-example" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code"><code>{
+          <div class="api-code-panel response-example" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Example JSON response, scrollable"><code>{
   "meta": {
     "dataset": {
       "release_tag": "db-2026.07.27-0913-11",
