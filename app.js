@@ -131,7 +131,6 @@
   }
 
   function routeHash(endpoint, kind = "resource") {
-    if (kind === "me" || endpoint === "/v1/me") return "#my-ip";
     if (kind === "ip" || endpoint.startsWith("/v1/ip/")) {
       const address = decodeURIComponent(endpoint.replace(/^\/v1\/ip\//, ""));
       return `#ip/${encodeURIComponent(address)}`;
@@ -173,10 +172,10 @@
     const hash = window.location.hash || "#my-ip";
     if (hash === "#" || hash === "#home") return { redirect: "#my-ip" };
     if (hash === "#api") return { page: "api" };
-    if (/^#api-(?:me|ip|prefix|range|asn|search)$/.test(hash)) {
+    if (/^#api-(?:ip|prefix|range|asn|search)$/.test(hash)) {
       return { page: "api", anchor: hash.slice(1) };
     }
-    if (hash === "#my-ip") return { page: "lookup", kind: "me", endpoint: "/v1/me", inputValue: "" };
+    if (hash === "#my-ip") return { page: "lookup", kind: "self", endpoint: "", inputValue: "" };
 
     if (hash.startsWith("#ip/")) {
       const address = decodeURIComponent(hash.slice(4));
@@ -262,7 +261,11 @@
       detectIPv6();
     }
     if (route.page === "lookup") {
-      lookupEndpoint(route.endpoint, route.kind, route.inputValue);
+      if (route.kind === "self") {
+        lookupCurrentIPv4();
+      } else {
+        lookupEndpoint(route.endpoint, route.kind, route.inputValue);
+      }
     }
   }
 
@@ -428,7 +431,7 @@
     const networkName = network.name || allocation.name || "Unidentified network";
     const locationName = joinedLocation(location, country);
     const protocol = hasValue(data.version) ? `IPv${data.version}` : "";
-    const resultLabel = kind === "me" ? "Current connection" : "Lookup result";
+    const resultLabel = kind === "self" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
     const subtitleParts = [
       hasValue(asn) ? asnQuery(asn) : "",
@@ -688,23 +691,46 @@
     return null;
   }
 
-  async function lookup(kind, ip = "") {
-	const endpoint = kind === "me" ? "/v1/me" : `/v1/ip/${encodeURIComponent(ip)}`;
-	return lookupEndpoint(endpoint, kind);
-  }
-
-  async function lookupEndpoint(endpoint, kind, inputValue = "") {
+  async function lookupCurrentIPv4() {
     if (activeLookup) activeLookup.abort();
     const controller = new AbortController();
     activeLookup = controller;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
 
     setLookupError();
-    if (hasValue(inputValue)) {
-      input.value = inputValue;
-    } else if (kind === "me") {
-      input.value = "";
+    input.value = "";
+    renderLoading();
+
+    try {
+      const response = await fetch("https://api4.ipify.org?format=json", {
+        signal: controller.signal,
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) {
+        throw new Error("Unable to determine your IPv4 address. Try again.");
+      }
+      const data = await response.json();
+      if (!data || !isIPv4(data.ip)) {
+        throw new Error("Unable to determine your IPv4 address. Try again.");
+      }
+      await lookupEndpoint(`/v1/ip/${encodeURIComponent(data.ip)}`, "self", data.ip, controller);
+    } catch (error) {
+      if (controller.signal.aborted && activeLookup !== controller) return;
+      renderError("Unable to determine your IPv4 address. Try again.");
+    } finally {
+      window.clearTimeout(timeout);
+      if (activeLookup === controller) activeLookup = null;
     }
+  }
+
+  async function lookupEndpoint(endpoint, kind, inputValue = "", sharedController = null) {
+    if (activeLookup && activeLookup !== sharedController) activeLookup.abort();
+    const controller = sharedController || new AbortController();
+    activeLookup = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+
+    setLookupError();
+    if (hasValue(inputValue)) input.value = inputValue;
     renderLoading();
 
     try {
@@ -719,10 +745,8 @@
       }
 
       const data = await response.json();
-      if (!data) {
-        throw new Error("The API returned an empty response.");
-      }
-      if (kind === "me" || kind === "ip") {
+      if (!data) throw new Error("The API returned an empty response.");
+      if (kind === "self" || kind === "ip") {
         if (!isIP(data.ip)) throw new Error("The API returned an invalid address record.");
         input.value = data.ip;
         renderResult(data, kind);
