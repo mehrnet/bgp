@@ -2,7 +2,7 @@
   "use strict";
 
   const API = "https://bgp-api.mehrnet.com";
-  const ICON_SPRITE = "icons.svg?v=20260727-0400";
+  const ICON_SPRITE = "icons.svg?v=20260727-0500";
   const homeView = document.querySelector("#home-view");
   const apiView = document.querySelector("#api-view");
   const apiLink = document.querySelector(".api-link");
@@ -18,7 +18,7 @@
 
   let activeLookup;
   let toastTimer;
-  let homeInitialized = false;
+  let ipv6Initialized = false;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (character) => ({
@@ -99,7 +99,116 @@
 
   function addressRange(start, end) {
     if (!hasValue(start) || !hasValue(end)) return "";
-    return `${start} – ${end}`;
+    return `${start} - ${end}`;
+  }
+
+  function queryButton(label, endpoint, kind = "resource") {
+    if (!hasValue(label) || !hasValue(endpoint)) return "";
+    return `<button class="query-link" type="button" data-lookup-endpoint="${escapeHtml(endpoint)}" data-lookup-kind="${escapeHtml(kind)}">${escapeHtml(label)}</button>`;
+  }
+
+  function prefixQuery(cidr) {
+    if (!hasValue(cidr)) return "";
+    return queryButton(cidr, `/v1/prefix?prefix=${encodeURIComponent(cidr)}`);
+  }
+
+  function asnQuery(asn) {
+    if (!hasValue(asn)) return "";
+    const query = String(asn).split(",")[0].trim();
+    return queryButton(asn, `/v1/asn/${encodeURIComponent(query)}`);
+  }
+
+  function ipQuery(ip) {
+    if (!hasValue(ip) || !isIP(String(ip))) return "";
+    return queryButton(ip, `/v1/ip/${encodeURIComponent(ip)}`, "ip");
+  }
+
+  function rangeQuery(start, end, kind = "allocations") {
+    const label = addressRange(start, end);
+    if (!hasValue(label)) return "";
+    const endpoint = `/v1/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}${kind === "routes" ? "&kind=routes" : ""}`;
+    return queryButton(label, endpoint);
+  }
+
+  function routeHash(endpoint, kind = "resource") {
+    if (kind === "me" || endpoint === "/v1/me") return "#my-ip";
+    if (kind === "ip" || endpoint.startsWith("/v1/ip/")) {
+      const address = decodeURIComponent(endpoint.replace(/^\/v1\/ip\//, ""));
+      return `#ip/${encodeURIComponent(address)}`;
+    }
+    if (endpoint.startsWith("/v1/asn/")) {
+      const asn = decodeURIComponent(endpoint.replace(/^\/v1\/asn\//, "").split("?")[0]);
+      return `#asn/${encodeURIComponent(asn)}`;
+    }
+    if (endpoint.startsWith("/v1/prefix")) {
+      const url = new URL(endpoint, API);
+      const prefix = url.searchParams.get("prefix") || "";
+      return prefix ? `#cidr/${encodeURIComponent(prefix)}` : "#my-ip";
+    }
+    if (endpoint.startsWith("/v1/range")) {
+      const url = new URL(endpoint, API);
+      const params = new URLSearchParams();
+      ["start", "end", "kind"].forEach((key) => {
+        const value = url.searchParams.get(key);
+        if (value) params.set(key, value);
+      });
+      return params.has("start") && params.has("end") ? `#range?${params.toString()}` : "#my-ip";
+    }
+    return "#my-ip";
+  }
+
+  function navigateToHash(hash) {
+    if (window.location.hash === hash) {
+      renderRoute();
+      return;
+    }
+    window.location.hash = hash;
+  }
+
+  function navigateToEndpoint(endpoint, kind = "resource") {
+    navigateToHash(routeHash(endpoint, kind));
+  }
+
+  function parseRouteHash() {
+    const hash = window.location.hash || "#my-ip";
+    if (hash === "#" || hash === "#home") return { redirect: "#my-ip" };
+    if (hash === "#api") return { page: "api" };
+    if (hash === "#my-ip") return { page: "lookup", kind: "me", endpoint: "/v1/me", inputValue: "" };
+
+    if (hash.startsWith("#ip/")) {
+      const address = decodeURIComponent(hash.slice(4));
+      return isIP(address)
+        ? { page: "lookup", kind: "ip", endpoint: `/v1/ip/${encodeURIComponent(address)}`, inputValue: address }
+        : { redirect: "#my-ip" };
+    }
+
+    if (hash.startsWith("#cidr/")) {
+      const cidr = decodeURIComponent(hash.slice(6));
+      return /^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(cidr)
+        ? { page: "lookup", kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(cidr)}`, inputValue: cidr }
+        : { redirect: "#my-ip" };
+    }
+
+    if (hash.startsWith("#asn/")) {
+      const asn = decodeURIComponent(hash.slice(5));
+      return /^(?:AS)?[1-9][0-9]*$/i.test(asn)
+        ? { page: "lookup", kind: "asn", endpoint: `/v1/asn/${encodeURIComponent(asn)}`, inputValue: asn }
+        : { redirect: "#my-ip" };
+    }
+
+    if (hash.startsWith("#range?")) {
+      const params = new URLSearchParams(hash.slice(7));
+      const start = params.get("start") || "";
+      const end = params.get("end") || "";
+      const kind = params.get("kind") === "routes" ? "routes" : "";
+      if (isIP(start) && isIP(end)) {
+        const endpoint = `/v1/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}${kind ? "&kind=routes" : ""}`;
+        return { page: "lookup", kind: "range", endpoint, inputValue: addressRange(start, end) };
+      }
+      return { redirect: "#my-ip" };
+    }
+
+    return { redirect: "#my-ip" };
   }
 
   function setLookupError(message = "") {
@@ -117,7 +226,14 @@
   }
 
   function renderRoute() {
-    const apiRoute = window.location.hash.toLowerCase() === "#api";
+    const route = parseRouteHash();
+    if (route.redirect) {
+      window.history.replaceState(null, "", route.redirect);
+      renderRoute();
+      return;
+    }
+
+    const apiRoute = route.page === "api";
     homeView.hidden = apiRoute;
     apiView.hidden = !apiRoute;
     document.title = apiRoute ? "MehrNet BGP API" : "MehrNet BGP";
@@ -132,20 +248,23 @@
     }
 
     apiLink.removeAttribute("aria-current");
-    if (!homeInitialized) {
-      homeInitialized = true;
-      lookup("me");
+    if (!ipv6Initialized) {
+      ipv6Initialized = true;
       detectIPv6();
+    }
+    if (route.page === "lookup") {
+      lookupEndpoint(route.endpoint, route.kind, route.inputValue);
     }
   }
 
   function bindCodeCopyButtons() {
-    document.querySelectorAll(".api-example").forEach((example) => {
-      const code = example.querySelector(".api-code code");
-      const actions = example.querySelector(".api-code-actions");
+    document.querySelectorAll(".api-code-panel").forEach((panel) => {
+      const code = panel.querySelector(".api-code code");
+      const actions = panel.querySelector(".api-code-actions");
+      if (!code || !actions) return;
       const button = codeCopyTemplate.content.firstElementChild.cloneNode(true);
       const label = button.querySelector("span");
-      const language = example.dataset.language;
+      const language = panel.dataset.language || "code";
       let resetTimer;
 
       button.setAttribute("aria-label", `Copy ${language} example`);
@@ -168,19 +287,36 @@
     });
   }
 
-  function valueOrUnavailable(value, leadingIcon = "") {
+  function activateLanguage(example, language) {
+    example.querySelectorAll("[data-language-tab]").forEach((button) => {
+      button.setAttribute("aria-selected", String(button.dataset.languageTab === language));
+    });
+    example.querySelectorAll("[data-language-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.languagePanel !== language;
+    });
+  }
+
+  function bindApiExampleTabs() {
+    document.querySelectorAll(".api-example").forEach((example) => {
+      example.querySelectorAll("[data-language-tab]").forEach((button) => {
+        button.addEventListener("click", () => activateLanguage(example, button.dataset.languageTab));
+      });
+    });
+  }
+
+  function valueOrUnavailable(value, leadingIcon = "", valueHtml = "") {
     if (!hasValue(value)) {
       return '<span class="quick-value muted">Not available</span>';
     }
     const className = leadingIcon ? "quick-value location-value" : "quick-value";
-    return `<span class="${className}">${leadingIcon}${escapeHtml(value)}</span>`;
+    return `<span class="${className}">${leadingIcon}${valueHtml || escapeHtml(value)}</span>`;
   }
 
-  function quickFact(label, value, iconName, leadingIcon = "") {
+  function quickFact(label, value, iconName, leadingIcon = "", valueHtml = "") {
     return `
       <div class="quick-fact">
         <span class="quick-heading">${icon(iconName)}<span class="record-label">${escapeHtml(label)}</span></span>
-        ${valueOrUnavailable(value, leadingIcon)}
+        ${valueOrUnavailable(value, leadingIcon, valueHtml)}
       </div>`;
   }
 
@@ -190,7 +326,7 @@
       .map((field) => `
         <div class="record-row">
           <dt>${escapeHtml(field.label)}</dt>
-          <dd>${escapeHtml(field.value)}</dd>
+          <dd>${field.html || escapeHtml(field.value)}</dd>
         </div>`)
       .join("");
   }
@@ -259,23 +395,27 @@
     const protocol = hasValue(data.version) ? `IPv${data.version}` : "";
     const resultLabel = kind === "me" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
-    const asSubtitle = [asn, network.cidr].filter(hasValue).join(" · ");
+    const subtitleParts = [
+      hasValue(asn) ? asnQuery(asn) : "",
+      hasValue(network.cidr) ? prefixQuery(network.cidr) : ""
+    ].filter(hasValue);
+    const asSubtitle = subtitleParts.join('<span class="query-separator"> - </span>');
     const flag = countryFlag(country);
 
     const routeFields = [
-      { label: "Prefix", value: network.cidr },
-      { label: "Origin ASN", value: asn },
+      { label: "Prefix", value: network.cidr, html: prefixQuery(network.cidr) },
+      { label: "Origin ASN", value: asn, html: asnQuery(asn) },
       { label: "AS number", value: network.as_number },
       { label: "Network name", value: network.name },
-      { label: "Start address", value: network.start_ip },
-      { label: "End address", value: network.end_ip },
+      { label: "Start address", value: network.start_ip, html: ipQuery(network.start_ip) },
+      { label: "End address", value: network.end_ip, html: ipQuery(network.end_ip) },
       { label: "Route status", value: network.status }
     ];
 
     const allocationFields = [
       { label: "Registry", value: allocation.registry || data.registry },
       { label: "Name", value: allocation.name },
-      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip) },
+      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
       { label: "Country", value: allocation.country_code || allocation.country_raw },
       { label: "Allocated", value: data.allocation_date || allocation.allocation_date },
       { label: "Status", value: allocationStatus }
@@ -293,7 +433,7 @@
         <div class="address-block">
           <span class="section-label">${icon("globe")}${resultLabel}</span>
           <div class="address-line">
-            <h2>${escapeHtml(data.ip)}</h2>
+            <h2>${ipQuery(data.ip) || escapeHtml(data.ip)}</h2>
             <button class="copy-button" type="button" data-copy="${escapeHtml(data.ip)}" aria-label="Copy IP address" title="Copy IP address">
               ${icon("copy")}
             </button>
@@ -308,13 +448,13 @@
         <div class="network-block">
           <span class="section-label">${icon("network")}Network</span>
           <strong>${escapeHtml(networkName)}</strong>
-          ${hasValue(asSubtitle) ? `<span class="network-subtitle">${escapeHtml(asSubtitle)}</span>` : ""}
+          ${hasValue(asSubtitle) ? `<span class="network-subtitle">${asSubtitle}</span>` : ""}
         </div>
       </section>
 
       <section class="quick-facts" aria-label="Key network facts">
-        ${quickFact("Origin ASN", asn, "network")}
-        ${quickFact("Route prefix", network.cidr, "route")}
+        ${quickFact("Origin ASN", asn, "network", "", asnQuery(asn))}
+        ${quickFact("Route prefix", network.cidr, "route", "", prefixQuery(network.cidr))}
         ${quickFact("Registry", hasValue(registry) ? String(registry).toUpperCase() : "", "registry")}
         ${quickFact("Location", locationName, "map-pin", flag)}
       </section>
@@ -334,6 +474,7 @@
         showToast("Unable to copy IP address");
       }
     });
+    bindResultControls();
   }
 
   function metadataFields(object) {
@@ -352,12 +493,15 @@
     if (!Array.isArray(objects) || !objects.length) return "";
     const rows = objects.map((object) => {
       const primary = type === "route" ? object.prefix : addressRange(object.start_ip, object.end_ip);
+      const primaryHtml = type === "route"
+        ? prefixQuery(object.prefix)
+        : rangeQuery(object.start_ip, object.end_ip);
       const details = type === "route"
         ? [object.origin_asn, object.relation, object.registry].filter(hasValue).join(" · ")
         : [object.name, object.country_code || object.country_raw, object.status].filter(hasValue).join(" · ");
       return `
         <article class="object-row">
-          <strong>${escapeHtml(primary || "Unspecified range")}</strong>
+          <strong>${primaryHtml || escapeHtml(primary || "Unspecified range")}</strong>
           ${hasValue(details) ? `<span>${escapeHtml(details)}</span>` : ""}
         </article>`;
     }).join("");
@@ -385,7 +529,7 @@
     const country = allocation.country_code || "";
     const flag = countryFlag(country);
     const allocationFields = [
-      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip) },
+      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
       { label: "Registry", value: allocation.registry },
       { label: "Network name", value: allocation.name },
       { label: "Country", value: allocation.country_code || allocation.country_raw },
@@ -399,7 +543,7 @@
       <section class="result-identity">
         <div class="address-block">
           <span class="section-label">${icon("route")}Prefix lookup</span>
-          <div class="address-line"><h2>${escapeHtml(prefix.cidr || "CIDR")}</h2></div>
+          <div class="address-line"><h2>${prefixQuery(prefix.cidr) || escapeHtml(prefix.cidr || "CIDR")}</h2></div>
           <div class="identity-meta">
             ${hasValue(prefix.version) ? `<span class="meta-chip accent">IPv${escapeHtml(prefix.version)}</span>` : ""}
             ${hasValue(prefix.prefix_length) ? `<span class="meta-chip">/${escapeHtml(prefix.prefix_length)}</span>` : ""}
@@ -409,7 +553,7 @@
         <div class="network-block">
           <span class="section-label">${icon("network")}Address space</span>
           <strong>${escapeHtml(prefix.address_count || "")}</strong>
-          <span class="network-subtitle">${escapeHtml(addressRange(prefix.start_ip, prefix.end_ip))}</span>
+          <span class="network-subtitle">${rangeQuery(prefix.start_ip, prefix.end_ip) || escapeHtml(addressRange(prefix.start_ip, prefix.end_ip))}</span>
         </div>
       </section>
       <div class="record-grid">
@@ -429,7 +573,7 @@
       <section class="result-identity">
         <div class="address-block">
           <span class="section-label">${icon("route")}Range lookup</span>
-          <div class="address-line"><h2>${escapeHtml(addressRange(rangeValue.start_ip, rangeValue.end_ip))}</h2></div>
+          <div class="address-line"><h2>${rangeQuery(rangeValue.start_ip, rangeValue.end_ip, kind) || escapeHtml(addressRange(rangeValue.start_ip, rangeValue.end_ip))}</h2></div>
           <div class="identity-meta">${hasValue(rangeValue.version) ? `<span class="meta-chip accent">IPv${escapeHtml(rangeValue.version)}</span>` : ""}</div>
         </div>
         <div class="network-block">
@@ -460,13 +604,13 @@
       <section class="result-identity">
         <div class="address-block">
           <span class="section-label">${icon("network")}Autonomous system</span>
-          <div class="address-line"><h2>${escapeHtml(data.asn || "ASN")}</h2></div>
+          <div class="address-line"><h2>${asnQuery(data.asn) || escapeHtml(data.asn || "ASN")}</h2></div>
           <div class="identity-meta"><span class="meta-chip accent">AS${escapeHtml(data.as_number || "")}</span></div>
         </div>
         <div class="network-block">
           <span class="section-label">${icon("registry")}Registered identity</span>
           <strong>${escapeHtml(autnum.name || autnum.organization || "No aut-num record")}</strong>
-          ${hasValue(autnum.country_code) ? `<span class="network-subtitle">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
+          ${hasValue(autnum.country_code) ? `<span class="network-subtitle with-flag-subtitle">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
         </div>
       </section>
       <div class="record-grid">
@@ -478,6 +622,9 @@
   }
 
   function bindResultControls() {
+    result.querySelectorAll("[data-lookup-endpoint]").forEach((button) => {
+      button.addEventListener("click", () => navigateToEndpoint(button.dataset.lookupEndpoint, button.dataset.lookupKind || "resource"));
+    });
     result.querySelectorAll("[data-next-url]").forEach((button) => {
       button.addEventListener("click", () => lookupEndpoint(button.dataset.nextUrl, "resource"));
     });
@@ -511,13 +658,18 @@
 	return lookupEndpoint(endpoint, kind);
   }
 
-  async function lookupEndpoint(endpoint, kind) {
+  async function lookupEndpoint(endpoint, kind, inputValue = "") {
     if (activeLookup) activeLookup.abort();
     const controller = new AbortController();
     activeLookup = controller;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
 
     setLookupError();
+    if (hasValue(inputValue)) {
+      input.value = inputValue;
+    } else if (kind === "me") {
+      input.value = "";
+    }
     renderLoading();
 
     try {
@@ -585,16 +737,21 @@
       input.focus();
       return;
     }
-    lookupEndpoint(lookupQuery.endpoint, lookupQuery.kind);
+    navigateToEndpoint(lookupQuery.endpoint, lookupQuery.kind);
   });
 
-  currentButton.addEventListener("click", () => lookup("me"));
-  ipv6Button.addEventListener("click", () => lookup("ip", ipv6Button.dataset.ip));
+  currentButton.addEventListener("click", () => navigateToHash("#my-ip"));
+  ipv6Button.addEventListener("click", () => {
+    if (ipv6Button.dataset.ip) {
+      navigateToEndpoint(`/v1/ip/${encodeURIComponent(ipv6Button.dataset.ip)}`, "ip");
+    }
+  });
 
   bindCodeCopyButtons();
+  bindApiExampleTabs();
   window.addEventListener("hashchange", renderRoute);
-  if (window.location.hash !== "#home" && window.location.hash !== "#api") {
-    window.history.replaceState(null, "", "#home");
+  if (!window.location.hash) {
+    window.history.replaceState(null, "", "#my-ip");
   }
   renderRoute();
 })();
