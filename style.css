@@ -222,8 +222,34 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.api-overview > span:last-child {
+.api-overview > span:not(.section-label) {
   grid-column: 2;
+}
+
+.openapi-link {
+  grid-column: 2;
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 0.0625rem solid var(--border-strong);
+  border-radius: 0.375rem;
+  color: var(--text);
+  background: var(--surface-soft);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.openapi-link:hover {
+  border-color: rgba(103, 232, 249, 0.42);
+  color: var(--info);
+}
+
+.openapi-link svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 
 .api-section {

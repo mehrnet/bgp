@@ -82,6 +82,10 @@
         <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-globe"></use></svg>Base URL</span>
         <code>https://bgp-api.mehrnet.com</code>
         <span>All endpoints return JSON. Lookup responses include <code>meta.dataset</code> with the active release tag, build time, activation time, and source commit.</span>
+        <a class="openapi-link" href="/openapi.json">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>
+          <span>OpenAPI JSON</span>
+        </a>
       </section>
 
       <section class="api-section" aria-labelledby="endpoints-title">
@@ -99,7 +103,7 @@
           <div><code>GET /v1/search?q={query}</code><span>Normalize an IP, CIDR, or ASN</span></div>
           <div><code>GET /v1/health</code><span>Service health and active dataset metadata</span></div>
         </div>
-        <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
+        <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. IP and current-connection lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
       </section>
 
       <section class="api-section" aria-labelledby="examples-title">

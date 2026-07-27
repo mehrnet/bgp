@@ -1,0 +1,950 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MehrNet BGP API",
+    "version": "1.0.0",
+    "description": "Lookup IPv4/IPv6 addresses, CIDR prefixes, IP ranges, ASNs, and active dataset metadata from MehrNet's daily BGP dataset."
+  },
+  "servers": [
+    {
+      "url": "https://bgp-api.mehrnet.com"
+    }
+  ],
+  "paths": {
+    "/v1/me": {
+      "get": {
+        "summary": "Look up the current connection address",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Details"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current address lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/ip/{address}": {
+      "get": {
+        "summary": "Look up an IPv4 or IPv6 address",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "1.1.1.1",
+                "2606:4700:4700::1111"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Details"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/prefix": {
+      "get": {
+        "summary": "Look up a CIDR prefix",
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "1.1.1.0/24",
+                "2606:4700:4700::/48"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prefix allocation and overlapping routes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrefixResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/range": {
+      "get": {
+        "summary": "Look up objects overlapping an IP range",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1.1.1.0"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1.1.1.255"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "allocations",
+                "routes"
+              ],
+              "default": "allocations"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Overlapping allocation or route records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/asn/{asn}": {
+      "get": {
+        "summary": "Look up an autonomous system",
+        "parameters": [
+          {
+            "name": "asn",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "AS13335",
+                "13335"
+              ]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aut-num record and registered routes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ASNResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/search": {
+      "get": {
+        "summary": "Normalize a user lookup query",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "1.1.1.1",
+                "1.1.1.0/24",
+                "AS13335"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized query and canonical API endpoint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "summary": "Check service and active dataset metadata",
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Details": {
+        "name": "details",
+        "in": "query",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        "description": "When set to full on IP and /me lookups, include the matched allocation, route, and geofeed candidate records used to build the compact response."
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Metadata": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetMetadata"
+          }
+        }
+      },
+      "DatasetMetadata": {
+        "type": "object",
+        "properties": {
+          "release_tag": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "built_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "activated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "LookupResponse": {
+        "type": "object",
+        "required": [
+          "ip",
+          "version",
+          "network",
+          "allocation",
+          "location",
+          "sources"
+        ],
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "enum": [
+              4,
+              6
+            ]
+          },
+          "registry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allocation_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allocation_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "network": {
+            "$ref": "#/components/schemas/Network"
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/Allocation"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location"
+          },
+          "sources": {
+            "$ref": "#/components/schemas/Sources"
+          },
+          "details": {
+            "$ref": "#/components/schemas/LookupDetails"
+          }
+        }
+      },
+      "Network": {
+        "type": "object",
+        "properties": {
+          "cidr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asn": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "as_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abuse_contact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Allocation": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AllocationObject"
+          }
+        ]
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "country_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Sources": {
+        "type": "object",
+        "properties": {
+          "allocation": {
+            "type": "boolean"
+          },
+          "route": {
+            "type": "boolean"
+          },
+          "geofeed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LookupDetails": {
+        "type": "object",
+        "properties": {
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupDetailRecord"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupDetailRecord"
+            }
+          },
+          "geofeeds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupDetailRecord"
+            }
+          }
+        }
+      },
+      "LookupDetailRecord": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AllocationObject"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "cidr": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "asn": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "as_number": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "region": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "PrefixResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "prefix": {
+            "$ref": "#/components/schemas/PrefixDescriptor"
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/AllocationObject"
+          },
+          "routes": {
+            "$ref": "#/components/schemas/RoutePage"
+          }
+        }
+      },
+      "RangeResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "range": {
+            "$ref": "#/components/schemas/RangeDescriptor"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "allocations",
+              "routes"
+            ]
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocationObject"
+            }
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteObject"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ASNResponse": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "asn": {
+            "type": "string"
+          },
+          "as_number": {
+            "type": "integer"
+          },
+          "autnum": {
+            "$ref": "#/components/schemas/AutnumObject"
+          },
+          "routes": {
+            "$ref": "#/components/schemas/RoutePage"
+          }
+        }
+      },
+      "PrefixDescriptor": {
+        "type": "object",
+        "properties": {
+          "cidr": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "prefix_length": {
+            "type": "integer"
+          },
+          "start_ip": {
+            "type": "string"
+          },
+          "end_ip": {
+            "type": "string"
+          },
+          "address_count": {
+            "type": "string"
+          }
+        }
+      },
+      "RangeDescriptor": {
+        "type": "object",
+        "properties": {
+          "start_ip": {
+            "type": "string"
+          },
+          "end_ip": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "address_count": {
+            "type": "string"
+          }
+        }
+      },
+      "RoutePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteObject"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RouteObject": {
+        "type": "object",
+        "properties": {
+          "prefix": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "origin_asn": {
+            "type": "string"
+          },
+          "as_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "relation": {
+            "type": "string"
+          },
+          "registry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maintainers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organization": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abuse_contact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AllocationObject": {
+        "type": "object",
+        "properties": {
+          "start_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "end_ip": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "registry": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country_raw": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allocation_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_modified": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maintainers": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organization": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abuse_contact": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AutnumObject": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AllocationObject"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "asn": {
+                "type": "string"
+              },
+              "as_number": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "ip",
+              "prefix",
+              "asn"
+            ]
+          },
+          "normalized": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "database": {
+            "type": "string"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetMetadata"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
