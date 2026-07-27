@@ -287,19 +287,28 @@
     });
   }
 
-  function activateLanguage(example, language) {
-    example.querySelectorAll("[data-language-tab]").forEach((button) => {
-      button.setAttribute("aria-selected", String(button.dataset.languageTab === language));
+  function activateLanguage(language) {
+    const availableLanguages = new Set(
+      Array.from(document.querySelectorAll("[data-language-tab]"), (button) => button.dataset.languageTab),
+    );
+    const activeLanguage = availableLanguages.has(language) ? language : "curl";
+    document.querySelectorAll("[data-language-tab]").forEach((button) => {
+      button.setAttribute("aria-selected", String(button.dataset.languageTab === activeLanguage));
     });
-    example.querySelectorAll("[data-language-panel]").forEach((panel) => {
-      panel.hidden = panel.dataset.languagePanel !== language;
+    document.querySelectorAll("[data-language-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.languagePanel !== activeLanguage;
     });
+    return activeLanguage;
   }
 
   function bindApiExampleTabs() {
-    document.querySelectorAll(".api-example").forEach((example) => {
-      example.querySelectorAll("[data-language-tab]").forEach((button) => {
-        button.addEventListener("click", () => activateLanguage(example, button.dataset.languageTab));
+    const selectedLanguage = localStorage.getItem("bgp_api_language") || "curl";
+    const activeLanguage = activateLanguage(selectedLanguage);
+    if (activeLanguage !== selectedLanguage) localStorage.setItem("bgp_api_language", activeLanguage);
+    document.querySelectorAll("[data-language-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        localStorage.setItem("bgp_api_language", button.dataset.languageTab);
+        activateLanguage(button.dataset.languageTab);
       });
     });
   }
