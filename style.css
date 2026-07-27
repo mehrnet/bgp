@@ -1979,6 +1979,93 @@ body.api-active {
   }
 }
 
+/* A service is a complete reference unit: explanation, request, and its own
+   response stay together so the reader never has to hunt through the page. */
+.api-active .api-operation {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-self: start;
+}
+
+.api-active .api-operation .api-code-panel {
+  grid-column: auto;
+  grid-row: auto;
+  min-height: 0;
+}
+
+.api-active .api-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0;
+  color: var(--api-muted);
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.api-active .api-panel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--api-ink);
+}
+
+.api-active .api-panel-label::before {
+  width: 0.4rem;
+  height: 0.4rem;
+  content: "";
+  background: currentColor;
+}
+
+.api-active .api-request-label {
+  color: var(--api-orange);
+}
+
+.api-active .api-response-label {
+  color: var(--api-cyan);
+}
+
+.api-active .api-response-panel {
+  border-color: rgba(103, 232, 249, 0.28);
+  background: #0a1114;
+}
+
+.api-active .api-response-panel .api-code {
+  min-height: 0;
+  max-height: 19rem;
+  padding-top: 2.875rem;
+  color: #c9d9dc;
+}
+
+.api-active .api-operation .api-code:focus-visible {
+  outline: 0.125rem solid var(--api-cyan);
+  outline-offset: -0.125rem;
+}
+
+@media (max-width: 42.5rem) {
+  .api-active .api-operation {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .api-active .api-operation .api-code-panel {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .api-active .api-response-panel .api-code {
+    max-height: 16rem;
+  }
+}
+
 /* API console: the documentation route belongs to the same dark product
    surface as the lookup route. This final layer intentionally replaces the
    earlier paper treatment without changing the API document structure. */

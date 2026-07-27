@@ -269,12 +269,20 @@
   function bindCodeCopyButtons() {
     document.querySelectorAll(".api-code-panel").forEach((panel) => {
       const code = panel.querySelector(".api-code code");
+      const codeRegion = panel.querySelector(".api-code");
       const actions = panel.querySelector(".api-code-actions");
       if (!code || !actions) return;
       const button = codeCopyTemplate.content.firstElementChild.cloneNode(true);
       const label = button.querySelector("span");
       const language = panel.dataset.language || "code";
+      const service = panel.closest(".api-example")?.querySelector("h3")?.textContent.trim() || "API";
+      const sampleType = panel.classList.contains("api-response-panel") ? "JSON response" : "request";
       let resetTimer;
+
+      if (codeRegion && !codeRegion.hasAttribute("aria-label")) {
+        codeRegion.tabIndex = 0;
+        codeRegion.setAttribute("aria-label", `${service} ${language} ${sampleType} example`);
+      }
 
       button.setAttribute("aria-label", `Copy ${language} example`);
       button.addEventListener("click", async () => {
