@@ -130,10 +130,17 @@
             </header>
             <div class="api-service-body">
               <p>Use this for "show my IP" flows. When the API is behind Cloudflare it validates the proxy path before trusting Cloudflare client-IP headers; otherwise it falls back to the raw peer address.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/me</code></dd></div>
-                <div><dt>Returns</dt><dd>Same compact lookup object as <code>/v1/ip/{address}</code></dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/me</code></p>
+              <section class="api-parameters" aria-labelledby="api-me-parameters">
+                <h4 id="api-me-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="Current connection parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody><tr><th scope="row"><code>details</code></th><td>Query</td><td>No</td><td>Return raw matched allocation, route, and geofeed candidates.</td></tr></tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Current connection request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/me"</span></code></pre></div>
@@ -175,10 +182,20 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             </header>
             <div class="api-service-body">
               <p>This is the primary service for IP intelligence. The compact response keeps the best route, best allocation, ASN number, location, and source booleans together without exposing every raw candidate by default.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/ip/{address}</code></dd></div>
-                <div><dt>Optional</dt><dd><code>?details=full</code> includes matched allocation, route, and geofeed candidates</dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/ip/{address}</code></p>
+              <section class="api-parameters" aria-labelledby="api-ip-parameters">
+                <h4 id="api-ip-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="IP address lookup parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row"><code>address</code></th><td>Path</td><td>Yes</td><td>IPv4 or IPv6 address.</td></tr>
+                      <tr><th scope="row"><code>details</code></th><td>Query</td><td>No</td><td>Return raw matched allocation, route, and geofeed candidates.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span></code></pre></div>
@@ -221,10 +238,21 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             </header>
             <div class="api-service-body">
               <p>Use prefix lookup when users click a CIDR or when you need route-object context around a network. It returns the normalized prefix descriptor, covering allocation, and paginated route matches.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/prefix?prefix={cidr}</code></dd></div>
-                <div><dt>Pagination</dt><dd><code>limit</code> and <code>cursor</code> apply to route matches</dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/prefix?prefix={cidr}</code></p>
+              <section class="api-parameters" aria-labelledby="api-prefix-parameters">
+                <h4 id="api-prefix-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="CIDR prefix lookup parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row"><code>prefix</code></th><td>Query</td><td>Yes</td><td>IPv4 or IPv6 CIDR.</td></tr>
+                      <tr><th scope="row"><code>limit</code></th><td>Query</td><td>No</td><td>1-100 route items.</td></tr>
+                      <tr><th scope="row"><code>cursor</code></th><td>Query</td><td>No</td><td>Continuation cursor.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="CIDR prefix lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/prefix?prefix=1.1.1.0%2F24&amp;limit=10"</span></code></pre></div>
@@ -271,10 +299,23 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             </header>
             <div class="api-service-body">
               <p>Range lookup is for explicit start/end scans. Use <code>kind=allocations</code> for registry blocks or <code>kind=routes</code> for registered route objects overlapping the same span.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/range?start={ip}&amp;end={ip}</code></dd></div>
-                <div><dt>Kind</dt><dd><code>allocations</code> by default, or <code>routes</code></dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/range?start={ip}&amp;end={ip}</code></p>
+              <section class="api-parameters" aria-labelledby="api-range-parameters">
+                <h4 id="api-range-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="Range lookup parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row"><code>start</code></th><td>Query</td><td>Yes</td><td>Range start IP address.</td></tr>
+                      <tr><th scope="row"><code>end</code></th><td>Query</td><td>Yes</td><td>Range end IP address.</td></tr>
+                      <tr><th scope="row"><code>kind</code></th><td>Query</td><td>No</td><td><code>allocations</code> by default, or <code>routes</code>.</td></tr>
+                      <tr><th scope="row"><code>limit</code></th><td>Query</td><td>No</td><td>1-100 items.</td></tr>
+                      <tr><th scope="row"><code>cursor</code></th><td>Query</td><td>No</td><td>Continuation cursor.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Range lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/range?start=1.1.1.0&amp;end=1.1.1.255&amp;kind=routes&amp;limit=10"</span></code></pre></div>
@@ -325,10 +366,21 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             </header>
             <div class="api-service-body">
               <p>ASN lookup returns the retained aut-num object and a paginated route list. It accepts both <code>AS13335</code> and <code>13335</code>.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/asn/{asn}</code></dd></div>
-                <div><dt>Pagination</dt><dd><code>limit</code> and <code>cursor</code> apply to routes</dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/asn/{asn}</code></p>
+              <section class="api-parameters" aria-labelledby="api-asn-parameters">
+                <h4 id="api-asn-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="ASN lookup parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row"><code>asn</code></th><td>Path</td><td>Yes</td><td>AS number with or without <code>AS</code>.</td></tr>
+                      <tr><th scope="row"><code>limit</code></th><td>Query</td><td>No</td><td>1-100 routes.</td></tr>
+                      <tr><th scope="row"><code>cursor</code></th><td>Query</td><td>No</td><td>Continuation cursor.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/asn/AS13335?limit=10"</span></code></pre></div>
@@ -370,10 +422,17 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
             </header>
             <div class="api-service-body">
               <p>Search is a small normalizer for user input. It returns the canonical query type and endpoint, so clients can redirect to the exact IP, prefix, or ASN resource.</p>
-              <dl class="api-service-facts">
-                <div><dt>Endpoint</dt><dd><code>GET /v1/search?q={query}</code></dd></div>
-                <div><dt>Recognizes</dt><dd>IP addresses, CIDR prefixes, and ASNs</dd></div>
-              </dl>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/search?q={query}</code></p>
+              <section class="api-parameters" aria-labelledby="api-search-parameters">
+                <h4 id="api-search-parameters">Parameters</h4>
+                <div class="api-table-scroll" tabindex="0" aria-label="Search lookup parameters">
+                  <table>
+                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
+                    <tbody><tr><th scope="row"><code>q</code></th><td>Query</td><td>Yes</td><td>IP address, CIDR prefix, or ASN.</td></tr></tbody>
+                  </table>
+                </div>
+                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
+              </section>
             </div>
             <div class="api-operation">
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/search?q=AS13335"</span></code></pre></div>

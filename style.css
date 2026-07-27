@@ -217,8 +217,7 @@ a:focus-visible {
 
 .api-overview code,
 .api-note code,
-.api-endpoints code,
-.api-service-facts code {
+.api-endpoints code {
   color: var(--info);
   font-family: var(--mono);
 }
@@ -479,36 +478,109 @@ a:focus-visible {
   line-height: 1.6;
 }
 
-.api-service-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+.api-endpoint-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
   margin: 1rem 0 0;
-  padding: 0;
+  padding: 0.5rem 0;
+  border-top: 0.0625rem solid var(--border);
+  border-bottom: 0.0625rem solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
-.api-service-facts > div {
-  min-width: 0;
-  padding: 0.75rem;
-  border: 0.0625rem solid var(--border);
-  border-radius: 0.375rem;
-  background: var(--surface-soft);
+.api-endpoint-line span {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 750;
 }
 
-.api-service-facts dt {
-  margin: 0 0 0.3125rem;
+.api-endpoint-line code,
+.api-parameters code {
+  color: var(--info);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.api-parameters {
+  margin-top: 1rem;
+}
+
+.api-parameters h4 {
+  margin: 0 0 0.5rem;
   color: var(--text-muted);
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 750;
   letter-spacing: 0;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
-.api-service-facts dd {
-  margin: 0;
+.api-table-scroll {
+  position: relative;
+  width: 100%;
+  overflow-x: auto;
+  border-top: 0.0625rem solid var(--border);
+  border-bottom: 0.0625rem solid var(--border);
+}
+
+.api-table-scroll:focus-visible {
+  outline: 0.125rem solid var(--info);
+  outline-offset: 0.1875rem;
+}
+
+.api-parameters table {
+  width: 100%;
+  min-width: 39rem;
+  border-collapse: collapse;
   color: var(--text-soft);
   font-size: 0.8125rem;
   line-height: 1.45;
+  text-align: left;
+}
+
+.api-parameters th,
+.api-parameters td {
+  padding: 0.625rem 0.75rem;
+  vertical-align: top;
+}
+
+.api-parameters thead th {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.api-parameters tbody tr {
+  border-top: 0.0625rem solid var(--border);
+}
+
+.api-parameters tbody th {
+  width: 20%;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.api-parameters th:nth-child(2),
+.api-parameters td:nth-child(2) {
+  width: 12%;
+}
+
+.api-parameters th:nth-child(3),
+.api-parameters td:nth-child(3) {
+  width: 12%;
+}
+
+.api-table-scroll-hint {
+  display: none;
 }
 
 .api-operation {
@@ -1499,9 +1571,31 @@ h1 {
     gap: 0.375rem;
   }
 
-  .api-service-facts,
   .api-operation {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .api-parameters th,
+  .api-parameters td {
+    padding: 0.5625rem 0.625rem;
+  }
+
+  .api-table-scroll-hint {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+    margin: 0.375rem 0 0;
+    color: var(--text-soft);
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
+
+  .api-table-scroll-hint span {
+    color: var(--info);
+    font-size: 0.875rem;
+    line-height: 1;
   }
 
   .api-operation {
