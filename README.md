@@ -17,11 +17,12 @@ release workflow, and production sync tooling live in
   and Go.
 - Ships a static `openapi.json` file for the public API contract.
 
-The primary current-connection lookup is
-`https://bgp-api.mehrnet.com/v1/me`. A browser-side request to
-`https://api6.ipify.org` is used only to discover an additional IPv6 address
-for dual-stack visitors, because a single HTTP request can only arrive over one
-IP family. Any discovered address is still looked up through the MehrNet API.
+The browser temporarily resolves its IPv4 and optional IPv6 addresses through
+IPify, then looks each address up through `bgp-api`. The dedicated responders
+are maintained separately in [`mehrnet/ip-api`](https://github.com/mehrnet/ip-api)
+and will replace IPify after `ipv4.mehrnet.com` and `ipv6.mehrnet.com` are
+deployed. A single HTTP request can only arrive over one IP family, so the
+separate IPv6 resolution remains necessary for dual-stack visitors.
 
 ## Files
 
@@ -67,7 +68,6 @@ https://bgp-api.mehrnet.com
 
 Useful endpoints:
 
-- `GET /v1/me`
 - `GET /v1/ip/{address}`
 - `GET /v1/ip/{address}?details=full`
 - `GET /v1/prefix?prefix={cidr}`
