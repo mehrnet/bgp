@@ -136,7 +136,6 @@
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Current connection request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/me"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/me"</span>);
 <span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre></div>
@@ -154,16 +153,15 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Current connection JSON response example"><code>{
-  "meta": {"dataset": {"release_tag": "db-2026.07.27-0913-11"}},
-  "ip": "1.1.1.1",
-  "version": 4,
-  "registry": "apnic",
-  "network": {"cidr": "1.1.1.0/24", "asn": "AS13335", "as_number": 13335},
-  "location": {"country_code": "AU", "region": null, "city": null},
-  "sources": {"allocation": true, "route": true, "geofeed": false}
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Current connection JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"meta"</span><span class="token punctuation">: {</span><span class="token property">"dataset"</span><span class="token punctuation">: {</span><span class="token property">"release_tag"</span><span class="token punctuation">: </span><span class="token string">"db-2026.07.27-0913-11"</span><span class="token punctuation">}},</span>
+  <span class="token property">"ip"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.1"</span><span class="token punctuation">,</span>
+  <span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">,</span>
+  <span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"apnic"</span><span class="token punctuation">,</span>
+  <span class="token property">"network"</span><span class="token punctuation">: {</span><span class="token property">"cidr"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0/24"</span><span class="token punctuation">, </span><span class="token property">"asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"as_number"</span><span class="token punctuation">: </span><span class="token number">13335</span><span class="token punctuation">},</span>
+  <span class="token property">"location"</span><span class="token punctuation">: {</span><span class="token property">"country_code"</span><span class="token punctuation">: </span><span class="token string">"AU"</span><span class="token punctuation">, </span><span class="token property">"region"</span><span class="token punctuation">: </span><span class="token null">null</span><span class="token punctuation">, </span><span class="token property">"city"</span><span class="token punctuation">: </span><span class="token null">null</span><span class="token punctuation">},</span>
+  <span class="token property">"sources"</span><span class="token punctuation">: {</span><span class="token property">"allocation"</span><span class="token punctuation">: </span><span class="token boolean">true</span><span class="token punctuation">, </span><span class="token property">"route"</span><span class="token punctuation">: </span><span class="token boolean">true</span><span class="token punctuation">, </span><span class="token property">"geofeed"</span><span class="token punctuation">: </span><span class="token boolean">false</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
 
@@ -183,7 +181,6 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>);
 <span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre>
@@ -202,16 +199,15 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup JSON response example"><code>{
-  "meta": {"dataset": {"release_tag": "db-2026.07.27-0913-11"}},
-  "ip": "1.1.1.1", "version": 4, "registry": "apnic",
-  "allocation_status": "ASSIGNED PORTABLE",
-  "network": {"cidr": "1.1.1.0/24", "asn": "AS13335", "name": "APNIC-LABS"},
-  "allocation": {"country_code": "AU", "registry": "apnic"},
-  "location": {"country_code": "AU", "region": null, "city": null},
-  "sources": {"allocation": true, "route": true, "geofeed": false}
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"meta"</span><span class="token punctuation">: {</span><span class="token property">"dataset"</span><span class="token punctuation">: {</span><span class="token property">"release_tag"</span><span class="token punctuation">: </span><span class="token string">"db-2026.07.27-0913-11"</span><span class="token punctuation">}},</span>
+  <span class="token property">"ip"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.1"</span><span class="token punctuation">, </span><span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">, </span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"apnic"</span><span class="token punctuation">,</span>
+  <span class="token property">"allocation_status"</span><span class="token punctuation">: </span><span class="token string">"ASSIGNED PORTABLE"</span><span class="token punctuation">,</span>
+  <span class="token property">"network"</span><span class="token punctuation">: {</span><span class="token property">"cidr"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0/24"</span><span class="token punctuation">, </span><span class="token property">"asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"name"</span><span class="token punctuation">: </span><span class="token string">"APNIC-LABS"</span><span class="token punctuation">},</span>
+  <span class="token property">"allocation"</span><span class="token punctuation">: {</span><span class="token property">"country_code"</span><span class="token punctuation">: </span><span class="token string">"AU"</span><span class="token punctuation">, </span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"apnic"</span><span class="token punctuation">},</span>
+  <span class="token property">"location"</span><span class="token punctuation">: {</span><span class="token property">"country_code"</span><span class="token punctuation">: </span><span class="token string">"AU"</span><span class="token punctuation">, </span><span class="token property">"region"</span><span class="token punctuation">: </span><span class="token null">null</span><span class="token punctuation">, </span><span class="token property">"city"</span><span class="token punctuation">: </span><span class="token null">null</span><span class="token punctuation">},</span>
+  <span class="token property">"sources"</span><span class="token punctuation">: {</span><span class="token property">"allocation"</span><span class="token punctuation">: </span><span class="token boolean">true</span><span class="token punctuation">, </span><span class="token property">"route"</span><span class="token punctuation">: </span><span class="token boolean">true</span><span class="token punctuation">, </span><span class="token property">"geofeed"</span><span class="token punctuation">: </span><span class="token boolean">false</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
 
@@ -231,7 +227,6 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="CIDR prefix lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/prefix?prefix=1.1.1.0%2F24&amp;limit=10"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> url = <span class="token keyword">new</span> <span class="token function">URL</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/prefix"</span>);
 url.searchParams.<span class="token function">set</span>(<span class="token string">"prefix"</span>, <span class="token string">"1.1.1.0/24"</span>);
@@ -254,16 +249,15 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="CIDR prefix lookup JSON response example"><code>{
-  "meta": {"dataset": {"release_tag": "db-2026.07.27-0913-11"}},
-  "prefix": {"cidr": "1.1.1.0/24", "version": 4, "address_count": "256"},
-  "allocation": {"registry": "apnic", "country_code": "AU", "name": "APNIC-LABS"},
-  "routes": {
-    "items": [{"prefix": "1.1.1.0/24", "origin_asn": "AS13335", "relation": "exact"}],
-    "next_cursor": null
-  }
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="CIDR prefix lookup JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"meta"</span><span class="token punctuation">: {</span><span class="token property">"dataset"</span><span class="token punctuation">: {</span><span class="token property">"release_tag"</span><span class="token punctuation">: </span><span class="token string">"db-2026.07.27-0913-11"</span><span class="token punctuation">}},</span>
+  <span class="token property">"prefix"</span><span class="token punctuation">: {</span><span class="token property">"cidr"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0/24"</span><span class="token punctuation">, </span><span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">, </span><span class="token property">"address_count"</span><span class="token punctuation">: </span><span class="token string">"256"</span><span class="token punctuation">},</span>
+  <span class="token property">"allocation"</span><span class="token punctuation">: {</span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"apnic"</span><span class="token punctuation">, </span><span class="token property">"country_code"</span><span class="token punctuation">: </span><span class="token string">"AU"</span><span class="token punctuation">, </span><span class="token property">"name"</span><span class="token punctuation">: </span><span class="token string">"APNIC-LABS"</span><span class="token punctuation">},</span>
+  <span class="token property">"routes"</span><span class="token punctuation">: {</span>
+    <span class="token property">"items"</span><span class="token punctuation">: [{</span><span class="token property">"prefix"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0/24"</span><span class="token punctuation">, </span><span class="token property">"origin_asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"relation"</span><span class="token punctuation">: </span><span class="token string">"exact"</span><span class="token punctuation">}],</span>
+    <span class="token property">"next_cursor"</span><span class="token punctuation">: </span><span class="token null">null</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
 
@@ -283,7 +277,6 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Range lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/range?start=1.1.1.0&amp;end=1.1.1.255&amp;kind=routes&amp;limit=10"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> url = <span class="token keyword">new</span> <span class="token function">URL</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/range"</span>);
 url.searchParams.<span class="token function">set</span>(<span class="token string">"start"</span>, <span class="token string">"1.1.1.0"</span>);
@@ -312,14 +305,13 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Range lookup JSON response example"><code>{
-  "meta": {"dataset": {"release_tag": "db-2026.07.27-0913-11"}},
-  "range": {"start_ip": "1.1.1.0", "end_ip": "1.1.1.255", "version": 4, "address_count": "256"},
-  "kind": "routes",
-  "routes": [{"prefix": "1.1.1.0/24", "origin_asn": "AS13335", "registry": "apnic"}],
-  "next_cursor": null
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Range lookup JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"meta"</span><span class="token punctuation">: {</span><span class="token property">"dataset"</span><span class="token punctuation">: {</span><span class="token property">"release_tag"</span><span class="token punctuation">: </span><span class="token string">"db-2026.07.27-0913-11"</span><span class="token punctuation">}},</span>
+  <span class="token property">"range"</span><span class="token punctuation">: {</span><span class="token property">"start_ip"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0"</span><span class="token punctuation">, </span><span class="token property">"end_ip"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.255"</span><span class="token punctuation">, </span><span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">, </span><span class="token property">"address_count"</span><span class="token punctuation">: </span><span class="token string">"256"</span><span class="token punctuation">},</span>
+  <span class="token property">"kind"</span><span class="token punctuation">: </span><span class="token string">"routes"</span><span class="token punctuation">,</span>
+  <span class="token property">"routes"</span><span class="token punctuation">: [{</span><span class="token property">"prefix"</span><span class="token punctuation">: </span><span class="token string">"1.1.1.0/24"</span><span class="token punctuation">, </span><span class="token property">"origin_asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"apnic"</span><span class="token punctuation">}],</span>
+  <span class="token property">"next_cursor"</span><span class="token punctuation">: </span><span class="token null">null</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
 
@@ -339,7 +331,6 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/asn/AS13335?limit=10"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn/AS13335?limit=10"</span>);
 <span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre></div>
@@ -357,16 +348,15 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup JSON response example"><code>{
-  "meta": {"dataset": {"release_tag": "db-2026.07.27-0913-11"}},
-  "asn": "AS13335", "as_number": 13335,
-  "autnum": {"name": "CLOUDFLARENET-AS", "registry": "arin", "source": "ARIN"},
-  "routes": {
-    "items": [{"prefix": "197.234.240.0/22", "origin_asn": "AS13335", "version": 4}],
-    "next_cursor": "87810"
-  }
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"meta"</span><span class="token punctuation">: {</span><span class="token property">"dataset"</span><span class="token punctuation">: {</span><span class="token property">"release_tag"</span><span class="token punctuation">: </span><span class="token string">"db-2026.07.27-0913-11"</span><span class="token punctuation">}},</span>
+  <span class="token property">"asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"as_number"</span><span class="token punctuation">: </span><span class="token number">13335</span><span class="token punctuation">,</span>
+  <span class="token property">"autnum"</span><span class="token punctuation">: {</span><span class="token property">"name"</span><span class="token punctuation">: </span><span class="token string">"CLOUDFLARENET-AS"</span><span class="token punctuation">, </span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"arin"</span><span class="token punctuation">, </span><span class="token property">"source"</span><span class="token punctuation">: </span><span class="token string">"ARIN"</span><span class="token punctuation">},</span>
+  <span class="token property">"routes"</span><span class="token punctuation">: {</span>
+    <span class="token property">"items"</span><span class="token punctuation">: [{</span><span class="token property">"prefix"</span><span class="token punctuation">: </span><span class="token string">"197.234.240.0/22"</span><span class="token punctuation">, </span><span class="token property">"origin_asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">}],</span>
+    <span class="token property">"next_cursor"</span><span class="token punctuation">: </span><span class="token string">"87810"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
 
@@ -386,7 +376,6 @@ json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
               </dl>
             </div>
             <div class="api-operation">
-              <div class="api-panel-heading"><span class="api-panel-label api-request-label">Request</span><span>selected language</span></div>
             <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/search?q=AS13335"</span></code></pre></div>
             <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> url = <span class="token keyword">new</span> <span class="token function">URL</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/search"</span>);
 url.searchParams.<span class="token function">set</span>(<span class="token string">"q"</span>, <span class="token string">"AS13335"</span>);
@@ -407,13 +396,12 @@ defer resp.Body.Close()
 
 var data map[string]any
 json.NewDecoder(resp.Body).Decode(&amp;data)</code></pre></div>
-              <div class="api-panel-heading"><span class="api-panel-label api-response-label">200 response</span><span>application/json</span></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup JSON response example"><code>{
-  "query": "AS13335",
-  "type": "asn",
-  "normalized": "AS13335",
-  "endpoint": "/v1/asn/AS13335"
-}</code></pre></div>
+              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup JSON response example"><code><span class="token punctuation">{</span>
+  <span class="token property">"query"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">,</span>
+  <span class="token property">"type"</span><span class="token punctuation">: </span><span class="token string">"asn"</span><span class="token punctuation">,</span>
+  <span class="token property">"normalized"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">,</span>
+  <span class="token property">"endpoint"</span><span class="token punctuation">: </span><span class="token string">"/v1/asn/AS13335"</span>
+<span class="token punctuation">}</span></code></pre></div>
             </div>
           </article>
         </div>

@@ -279,12 +279,21 @@
       const sampleType = panel.classList.contains("api-response-panel") ? "JSON response" : "request";
       let resetTimer;
 
+      const panelLabel = document.createElement("span");
+      panelLabel.className = "api-code-label";
+      panelLabel.textContent = panel.classList.contains("api-response-panel") ? "200 response" : "Request";
+
+      const panelType = document.createElement("span");
+      panelType.className = "api-code-type";
+      panelType.textContent = panel.classList.contains("api-response-panel") ? "application/json" : language;
+
       if (codeRegion && !codeRegion.hasAttribute("aria-label")) {
         codeRegion.tabIndex = 0;
         codeRegion.setAttribute("aria-label", `${service} ${language} ${sampleType} example`);
       }
 
-      button.setAttribute("aria-label", `Copy ${language} example`);
+      button.setAttribute("aria-label", `Copy ${language} ${sampleType}`);
+      button.title = `Copy ${language} ${sampleType}`;
       button.addEventListener("click", async () => {
         window.clearTimeout(resetTimer);
         try {
@@ -300,7 +309,7 @@
           delete button.dataset.copyState;
         }, 1800);
       });
-      actions.append(button);
+      actions.append(panelLabel, panelType, button);
     });
   }
 
