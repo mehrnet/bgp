@@ -926,6 +926,9 @@
           },
           "dataset": {
             "$ref": "#/components/schemas/DatasetMetadata"
+          },
+          "build": {
+            "$ref": "#/components/schemas/BuildInfo"
           }
         }
       },
@@ -942,6 +945,29 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "BuildInfo": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "built_at": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
