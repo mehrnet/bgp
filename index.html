@@ -82,7 +82,7 @@
         <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-globe"></use></svg>Base URL</span>
         <code>https://bgp-api.mehrnet.com</code>
         <span>No key, no client library. Lookup responses include <code>meta.dataset</code> so every answer can be traced to its source build.</span>
-        <a class="openapi-link" href="/openapi.json">
+        <a class="openapi-link" href="/openapi.json?v=20260728-1000">
           <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>
           <span>OpenAPI JSON</span>
         </a>
@@ -94,11 +94,10 @@
           <h2 id="endpoints-title">Lookup resources</h2>
         </div>
         <nav class="api-endpoints" aria-label="API endpoint directory">
-          <a href="#api-ip"><span class="endpoint-method">GET</span><code>/v1/ip/{address}</code><span>IPv4 or IPv6 address</span></a>
+          <a href="#api-ip"><span class="endpoint-method">GET</span><code>/v1/ip?query={address}</code><span>IPv4 or IPv6 address</span></a>
           <a href="#api-prefix"><span class="endpoint-method">GET</span><code>/v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></a>
           <a href="#api-range"><span class="endpoint-method">GET</span><code>/v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations or routes</span></a>
           <a href="#api-asn"><span class="endpoint-method">GET</span><code>/v1/asn/{asn}</code><span>Aut-num record and registered routes</span></a>
-          <a href="#api-search"><span class="endpoint-method">GET</span><code>/v1/search?q={query}</code><span>Normalize an IP, CIDR, or ASN</span></a>
         </nav>
         <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. IP lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
       </section>
@@ -129,14 +128,14 @@
             </header>
             <div class="api-service-body">
               <p>This is the primary service for IP intelligence. The compact response keeps the best route, best allocation, ASN number, location, and source booleans together without exposing every raw candidate by default.</p>
-              <p class="api-endpoint-line"><span>GET</span><code>/v1/ip/{address}</code></p>
+              <p class="api-endpoint-line"><span>GET</span><code>/v1/ip?query={address}</code></p>
               <section class="api-parameters" aria-labelledby="api-ip-parameters">
                 <h4 id="api-ip-parameters">Parameters</h4>
                 <div class="api-table-scroll" tabindex="0" aria-label="IP address lookup parameters">
                   <table>
                     <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
                     <tbody>
-                      <tr><th scope="row"><code>address</code></th><td>Path</td><td>Yes</td><td>IPv4 or IPv6 address.</td></tr>
+                      <tr><th scope="row"><code>query</code></th><td>Query</td><td>Yes</td><td>IPv4 or IPv6 address.</td></tr>
                       <tr><th scope="row"><code>details</code></th><td>Query</td><td>No</td><td>Return raw matched allocation, route, and geofeed candidates.</td></tr>
                     </tbody>
                   </table>
@@ -145,17 +144,17 @@
               </section>
             </div>
             <div class="api-operation">
-            <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span></code></pre></div>
-            <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>);
+            <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="IP address lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"</span></code></pre></div>
+            <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"</span>);
 <span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre>
             </div>
-            <div class="api-code-panel" data-language-panel="php" data-language="PHP" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">$json</span> = <span class="token function">file_get_contents</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>);
+            <div class="api-code-panel" data-language-panel="php" data-language="PHP" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">$json</span> = <span class="token function">file_get_contents</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"</span>);
 <span class="token variable">$data</span> = <span class="token function">json_decode</span>(<span class="token variable">$json</span>, <span class="token boolean">true</span>);</code></pre></div>
             <div class="api-code-panel" data-language-panel="python" data-language="Python" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">from</span> urllib.request <span class="token keyword">import</span> urlopen
 <span class="token keyword">import</span> json
 
-data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>))</code></pre></div>
-            <div class="api-code-panel" data-language-panel="go" data-language="Go" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">resp</span>, <span class="token variable">err</span> := <span class="token function">http.Get</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"</span>)
+data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"</span>))</code></pre></div>
+            <div class="api-code-panel" data-language-panel="go" data-language="Go" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">resp</span>, <span class="token variable">err</span> := <span class="token function">http.Get</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"</span>)
 <span class="token keyword">if</span> <span class="token variable">err</span> != <span class="token constant">nil</span> {
   <span class="token function">log.Fatal</span>(<span class="token variable">err</span>)
 }
@@ -359,57 +358,6 @@ data = json.<span class="token function">load</span>(<span class="token function
             </div>
           </article>
 
-          <article class="api-example lookup-example" id="api-search">
-            <header class="api-example-header">
-              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
-              <div>
-                <h3>Search lookup</h3>
-                <p>Let the API normalize a user-entered IP, CIDR, or AS number and return the matching resource.</p>
-              </div>
-            </header>
-            <div class="api-service-body">
-              <p>Search is a small normalizer for user input. It returns the canonical query type and endpoint, so clients can redirect to the exact IP, prefix, or ASN resource.</p>
-              <p class="api-endpoint-line"><span>GET</span><code>/v1/search?q={query}</code></p>
-              <section class="api-parameters" aria-labelledby="api-search-parameters">
-                <h4 id="api-search-parameters">Parameters</h4>
-                <div class="api-table-scroll" tabindex="0" aria-label="Search lookup parameters">
-                  <table>
-                    <thead><tr><th scope="col">Parameter</th><th scope="col">In</th><th scope="col">Required</th><th scope="col">Description</th></tr></thead>
-                    <tbody><tr><th scope="row"><code>q</code></th><td>Query</td><td>Yes</td><td>IP address, CIDR prefix, or ASN.</td></tr></tbody>
-                  </table>
-                </div>
-                <p class="api-table-scroll-hint">Scroll for all columns <span aria-hidden="true">&rarr;</span></p>
-              </section>
-            </div>
-            <div class="api-operation">
-            <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/search?q=AS13335"</span></code></pre></div>
-            <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> url = <span class="token keyword">new</span> <span class="token function">URL</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/search"</span>);
-url.searchParams.<span class="token function">set</span>(<span class="token string">"q"</span>, <span class="token string">"AS13335"</span>);
-<span class="token keyword">const</span> data = <span class="token keyword">await</span> (<span class="token keyword">await</span> <span class="token function">fetch</span>(url)).<span class="token function">json</span>();</code></pre></div>
-            <div class="api-code-panel" data-language-panel="php" data-language="PHP" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">$url</span> = <span class="token string">"https://bgp-api.mehrnet.com/v1/search?q="</span> . <span class="token function">rawurlencode</span>(<span class="token string">"AS13335"</span>);
-<span class="token variable">$data</span> = <span class="token function">json_decode</span>(<span class="token function">file_get_contents</span>(<span class="token variable">$url</span>), <span class="token boolean">true</span>);</code></pre></div>
-            <div class="api-code-panel" data-language-panel="python" data-language="Python" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">from</span> urllib.parse <span class="token keyword">import</span> urlencode
-<span class="token keyword">from</span> urllib.request <span class="token keyword">import</span> urlopen
-<span class="token keyword">import</span> json
-
-query = urlencode({<span class="token string">"q"</span>: <span class="token string">"AS13335"</span>})
-data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(<span class="token string">f"https://bgp-api.mehrnet.com/v1/search?{query}"</span>))</code></pre></div>
-            <div class="api-code-panel" data-language-panel="go" data-language="Go" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">resp</span>, <span class="token variable">err</span> := <span class="token function">http.Get</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/search?q=AS13335"</span>)
-<span class="token keyword">if</span> <span class="token variable">err</span> != <span class="token constant">nil</span> {
-  <span class="token function">log.Fatal</span>(<span class="token variable">err</span>)
-}
-<span class="token keyword">defer</span> <span class="token function">resp.Body.Close</span>()
-
-<span class="token keyword">var</span> <span class="token variable">data</span> <span class="token keyword">map</span>[<span class="token type">string</span>]<span class="token type">any</span>
-<span class="token function">json.NewDecoder</span>(<span class="token variable">resp</span>.Body).<span class="token function">Decode</span>(&amp;<span class="token variable">data</span>)</code></pre></div>
-              <div class="api-code-panel api-response-panel" data-language="JSON"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="Search lookup JSON response example"><code><span class="token punctuation">{</span>
-  <span class="token property">"query"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">,</span>
-  <span class="token property">"type"</span><span class="token punctuation">: </span><span class="token string">"asn"</span><span class="token punctuation">,</span>
-  <span class="token property">"normalized"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">,</span>
-  <span class="token property">"endpoint"</span><span class="token punctuation">: </span><span class="token string">"/v1/asn/AS13335"</span>
-<span class="token punctuation">}</span></code></pre></div>
-            </div>
-          </article>
         </div>
       </section>
 
@@ -423,6 +371,6 @@ data = json.<span class="token function">load</span>(<span class="token function
       <span>Copy</span>
     </button>
   </template>
-  <script src="app.js?v=20260727-0900"></script>
+  <script src="app.js?v=20260728-1000"></script>
 </body>
 </html>

@@ -15,264 +15,6 @@
     }
   ],
   "paths": {
-    "/v1/ip/{address}": {
-      "get": {
-        "summary": "Look up an IPv4 or IPv6 address",
-        "parameters": [
-          {
-            "name": "address",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "examples": [
-                "1.1.1.1",
-                "2606:4700:4700::1111"
-              ]
-            },
-            "description": "Canonical or parseable IPv4 or IPv6 address."
-          },
-          {
-            "$ref": "#/components/parameters/Details"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Address lookup result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LookupResponse"
-                },
-                "examples": {
-                  "compact": {
-                    "summary": "Compact IP lookup",
-                    "value": {
-                      "meta": {
-                        "dataset": {
-                          "release_tag": "db-2026.07.27-0913-11",
-                          "built_at": "2026-07-27T09:13:59Z",
-                          "activated_at": "2026-07-27 09:38:18.275618+00",
-                          "source_commit": "ac9d817ae1e35b3850b17fa0ab7bba32319969e8"
-                        }
-                      },
-                      "ip": "1.1.1.1",
-                      "version": 4,
-                      "registry": "apnic",
-                      "allocation_date": null,
-                      "allocation_status": "ASSIGNED PORTABLE",
-                      "network": {
-                        "cidr": "1.1.1.0/24",
-                        "start_ip": "1.1.1.0",
-                        "end_ip": "1.1.1.255",
-                        "asn": "AS13335",
-                        "asns": [
-                          "AS13335"
-                        ],
-                        "as_number": 13335,
-                        "name": "APNIC-LABS",
-                        "status": null,
-                        "abuse_contact": null
-                      },
-                      "allocation": {
-                        "start_ip": "1.1.1.0",
-                        "end_ip": "1.1.1.255",
-                        "registry": "apnic",
-                        "country_code": "AU",
-                        "country_raw": "AU",
-                        "name": "APNIC-LABS",
-                        "allocation_date": null,
-                        "status": "ASSIGNED PORTABLE",
-                        "abuse_contact": "AA1412-AP"
-                      },
-                      "location": {
-                        "country_code": "AU",
-                        "region": null,
-                        "city": null
-                      },
-                      "sources": {
-                        "allocation": true,
-                        "route": true,
-                        "geofeed": false
-                      }
-                    }
-                  },
-                  "full": {
-                    "summary": "IP lookup with details=full",
-                    "value": {
-                      "meta": {
-                        "dataset": {
-                          "release_tag": "db-2026.07.27-0913-11",
-                          "built_at": "2026-07-27T09:13:59Z",
-                          "activated_at": "2026-07-27 09:38:18.275618+00",
-                          "source_commit": "ac9d817ae1e35b3850b17fa0ab7bba32319969e8"
-                        }
-                      },
-                      "ip": "1.1.1.1",
-                      "version": 4,
-                      "registry": "apnic",
-                      "allocation_date": null,
-                      "allocation_status": "ASSIGNED PORTABLE",
-                      "network": {
-                        "cidr": "1.1.1.0/24",
-                        "start_ip": "1.1.1.0",
-                        "end_ip": "1.1.1.255",
-                        "asn": "AS13335",
-                        "asns": [
-                          "AS13335"
-                        ],
-                        "as_number": 13335,
-                        "name": "APNIC-LABS",
-                        "status": null,
-                        "abuse_contact": null
-                      },
-                      "allocation": {
-                        "start_ip": "1.1.1.0",
-                        "end_ip": "1.1.1.255",
-                        "registry": "apnic",
-                        "country_code": "AU",
-                        "country_raw": "AU",
-                        "name": "APNIC-LABS",
-                        "allocation_date": null,
-                        "status": "ASSIGNED PORTABLE",
-                        "abuse_contact": "AA1412-AP"
-                      },
-                      "location": {
-                        "country_code": "AU",
-                        "region": null,
-                        "city": null
-                      },
-                      "sources": {
-                        "allocation": true,
-                        "route": true,
-                        "geofeed": false
-                      },
-                      "details": {
-                        "allocations": [
-                          {
-                            "start_ip": "1.1.1.0",
-                            "end_ip": "1.1.1.255",
-                            "version": 4,
-                            "registry": "apnic",
-                            "country_code": "AU",
-                            "country_raw": "AU",
-                            "name": "APNIC-LABS",
-                            "status": "ASSIGNED PORTABLE",
-                            "last_modified": "2023-04-26T22:57:58Z",
-                            "source": "APNIC",
-                            "maintainers": "APNIC-HM",
-                            "organization": "ORG-ARAD1-AP",
-                            "abuse_contact": "AA1412-AP",
-                            "description": "APNIC and Cloudflare DNS Resolver project | Routed globally by AS13335/Cloudflare | Research prefix for APNIC Labs"
-                          },
-                          {
-                            "start_ip": "0.0.0.0",
-                            "end_ip": "1.178.111.255",
-                            "version": 4,
-                            "registry": "ripe",
-                            "country_raw": "EU # COUNTRY IS REALLY WORLD WIDE",
-                            "name": "NON-RIPE-NCC-MANAGED-ADDRESS-BLOCK",
-                            "status": "ALLOCATED UNSPECIFIED",
-                            "created": "2021-12-06T15:26:36Z",
-                            "last_modified": "2021-12-06T15:26:36Z",
-                            "source": "RIPE",
-                            "maintainers": "RIPE-NCC-HM-MNT",
-                            "description": "IPv4 address block not managed by the RIPE NCC"
-                          },
-                          {
-                            "start_ip": "1.0.0.0",
-                            "end_ip": "1.255.255.255",
-                            "version": 4,
-                            "registry": "apnic",
-                            "country_code": "AU",
-                            "country_raw": "AU",
-                            "name": "APNIC-AP",
-                            "status": "ALLOCATED PORTABLE",
-                            "last_modified": "2023-09-05T01:46:01Z",
-                            "source": "APNIC",
-                            "maintainers": "APNIC-HM",
-                            "organization": "ORG-APNI3-AP",
-                            "abuse_contact": "AA1452-AP",
-                            "description": "Asia Pacific Network Information Centre | Regional Internet Registry for the Asia-Pacific Region | 6 Cordelia Street | PO Box 3646 | South Brisbane, QLD 4101 | Australia"
-                          },
-                          {
-                            "start_ip": "0.0.0.0",
-                            "end_ip": "255.255.255.255",
-                            "version": 4,
-                            "registry": "afrinic",
-                            "country_raw": "EU # COUNTRY IS REALLY WORLD WIDE",
-                            "name": "IANA-BLK",
-                            "status": "ALLOCATED UNSPECIFIED",
-                            "source": "AFRINIC",
-                            "maintainers": "AFRINIC-HM-MNT",
-                            "organization": "ORG-IANA1-AFRINIC",
-                            "description": "The whole IPv4 address space"
-                          },
-                          {
-                            "start_ip": "0.0.0.0",
-                            "end_ip": "255.255.255.255",
-                            "version": 4,
-                            "registry": "apnic",
-                            "country_code": "AU",
-                            "country_raw": "AU",
-                            "name": "IANA-BLOCK",
-                            "status": "ALLOCATED PORTABLE",
-                            "last_modified": "2008-09-04T06:51:49Z",
-                            "source": "APNIC",
-                            "maintainers": "MAINT-APNIC-AP",
-                            "description": "General placeholder reference for all IPv4 addresses"
-                          },
-                          {
-                            "start_ip": "0.0.0.0",
-                            "end_ip": "255.255.255.255",
-                            "version": 4,
-                            "registry": "ripe",
-                            "country_raw": "EU # COUNTRY FIELD IS ACTUALLY ALL COUNTRIES IN THE WORLD AND NOT JUST EU COUNTRIES",
-                            "name": "IANA-BLK",
-                            "status": "ALLOCATED UNSPECIFIED",
-                            "created": "2002-06-25T14:19:09Z",
-                            "last_modified": "2018-11-23T10:30:34Z",
-                            "source": "RIPE",
-                            "maintainers": "RIPE-NCC-HM-MNT",
-                            "organization": "ORG-IANA1-RIPE",
-                            "description": "The whole IPv4 address space"
-                          }
-                        ],
-                        "routes": [
-                          {
-                            "start_ip": "1.1.1.0",
-                            "end_ip": "1.1.1.255",
-                            "version": 4,
-                            "registry": "apnic",
-                            "cidr": "1.1.1.0/24",
-                            "asn": "AS13335",
-                            "as_number": 13335,
-                            "source": "APNIC",
-                            "maintainers": "MAINT-APNICRANDNET",
-                            "description": "APNIC Research and Development"
-                          }
-                        ]
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "tags": [
-          "IP lookup"
-        ],
-        "operationId": "lookupIpAddress",
-        "description": "Returns the compact BGP/allocation/geofeed lookup object for one IPv4 or IPv6 address. Add details=full to include the matched candidate records used to build the compact response."
-      }
-    },
     "/v1/prefix": {
       "get": {
         "summary": "Look up a CIDR prefix",
@@ -595,58 +337,6 @@
         "description": "Returns the retained aut-num object and route objects originated by the ASN. The path value accepts AS-prefixed and numeric forms."
       }
     },
-    "/v1/search": {
-      "get": {
-        "summary": "Normalize a user lookup query",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "examples": [
-                "1.1.1.1",
-                "1.1.1.0/24",
-                "AS13335"
-              ]
-            },
-            "description": "User-entered lookup query. Supports IP addresses, CIDR prefixes, AS-prefixed ASNs, and numeric ASNs."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Normalized query and canonical API endpoint",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchResponse"
-                },
-                "examples": {
-                  "asn": {
-                    "summary": "Normalized ASN query",
-                    "value": {
-                      "query": "AS13335",
-                      "type": "asn",
-                      "normalized": "AS13335",
-                      "endpoint": "/v1/asn/AS13335"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/Error"
-          }
-        },
-        "tags": [
-          "Search"
-        ],
-        "operationId": "normalizeLookupQuery",
-        "description": "Normalizes a user-entered IP address, CIDR prefix, or ASN and returns the canonical endpoint the client should open next."
-      }
-    },
     "/v1/health": {
       "get": {
         "summary": "Check service and active dataset metadata",
@@ -693,6 +383,264 @@
         "operationId": "getHealth",
         "description": "Returns service status, active dataset metadata, and running binary build metadata."
       }
+    },
+    "/v1/ip": {
+      "get": {
+        "summary": "Look up an IPv4 or IPv6 address",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "1.1.1.1",
+                "2606:4700:4700::1111"
+              ]
+            },
+            "description": "IPv4 or IPv6 address to look up."
+          },
+          {
+            "$ref": "#/components/parameters/Details"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                },
+                "examples": {
+                  "compact": {
+                    "summary": "Compact IP lookup",
+                    "value": {
+                      "meta": {
+                        "dataset": {
+                          "release_tag": "db-2026.07.27-0913-11",
+                          "built_at": "2026-07-27T09:13:59Z",
+                          "activated_at": "2026-07-27 09:38:18.275618+00",
+                          "source_commit": "ac9d817ae1e35b3850b17fa0ab7bba32319969e8"
+                        }
+                      },
+                      "ip": "1.1.1.1",
+                      "version": 4,
+                      "registry": "apnic",
+                      "allocation_date": null,
+                      "allocation_status": "ASSIGNED PORTABLE",
+                      "network": {
+                        "cidr": "1.1.1.0/24",
+                        "start_ip": "1.1.1.0",
+                        "end_ip": "1.1.1.255",
+                        "asn": "AS13335",
+                        "asns": [
+                          "AS13335"
+                        ],
+                        "as_number": 13335,
+                        "name": "APNIC-LABS",
+                        "status": null,
+                        "abuse_contact": null
+                      },
+                      "allocation": {
+                        "start_ip": "1.1.1.0",
+                        "end_ip": "1.1.1.255",
+                        "registry": "apnic",
+                        "country_code": "AU",
+                        "country_raw": "AU",
+                        "name": "APNIC-LABS",
+                        "allocation_date": null,
+                        "status": "ASSIGNED PORTABLE",
+                        "abuse_contact": "AA1412-AP"
+                      },
+                      "location": {
+                        "country_code": "AU",
+                        "region": null,
+                        "city": null
+                      },
+                      "sources": {
+                        "allocation": true,
+                        "route": true,
+                        "geofeed": false
+                      }
+                    }
+                  },
+                  "full": {
+                    "summary": "IP lookup with details=full",
+                    "value": {
+                      "meta": {
+                        "dataset": {
+                          "release_tag": "db-2026.07.27-0913-11",
+                          "built_at": "2026-07-27T09:13:59Z",
+                          "activated_at": "2026-07-27 09:38:18.275618+00",
+                          "source_commit": "ac9d817ae1e35b3850b17fa0ab7bba32319969e8"
+                        }
+                      },
+                      "ip": "1.1.1.1",
+                      "version": 4,
+                      "registry": "apnic",
+                      "allocation_date": null,
+                      "allocation_status": "ASSIGNED PORTABLE",
+                      "network": {
+                        "cidr": "1.1.1.0/24",
+                        "start_ip": "1.1.1.0",
+                        "end_ip": "1.1.1.255",
+                        "asn": "AS13335",
+                        "asns": [
+                          "AS13335"
+                        ],
+                        "as_number": 13335,
+                        "name": "APNIC-LABS",
+                        "status": null,
+                        "abuse_contact": null
+                      },
+                      "allocation": {
+                        "start_ip": "1.1.1.0",
+                        "end_ip": "1.1.1.255",
+                        "registry": "apnic",
+                        "country_code": "AU",
+                        "country_raw": "AU",
+                        "name": "APNIC-LABS",
+                        "allocation_date": null,
+                        "status": "ASSIGNED PORTABLE",
+                        "abuse_contact": "AA1412-AP"
+                      },
+                      "location": {
+                        "country_code": "AU",
+                        "region": null,
+                        "city": null
+                      },
+                      "sources": {
+                        "allocation": true,
+                        "route": true,
+                        "geofeed": false
+                      },
+                      "details": {
+                        "allocations": [
+                          {
+                            "start_ip": "1.1.1.0",
+                            "end_ip": "1.1.1.255",
+                            "version": 4,
+                            "registry": "apnic",
+                            "country_code": "AU",
+                            "country_raw": "AU",
+                            "name": "APNIC-LABS",
+                            "status": "ASSIGNED PORTABLE",
+                            "last_modified": "2023-04-26T22:57:58Z",
+                            "source": "APNIC",
+                            "maintainers": "APNIC-HM",
+                            "organization": "ORG-ARAD1-AP",
+                            "abuse_contact": "AA1412-AP",
+                            "description": "APNIC and Cloudflare DNS Resolver project | Routed globally by AS13335/Cloudflare | Research prefix for APNIC Labs"
+                          },
+                          {
+                            "start_ip": "0.0.0.0",
+                            "end_ip": "1.178.111.255",
+                            "version": 4,
+                            "registry": "ripe",
+                            "country_raw": "EU # COUNTRY IS REALLY WORLD WIDE",
+                            "name": "NON-RIPE-NCC-MANAGED-ADDRESS-BLOCK",
+                            "status": "ALLOCATED UNSPECIFIED",
+                            "created": "2021-12-06T15:26:36Z",
+                            "last_modified": "2021-12-06T15:26:36Z",
+                            "source": "RIPE",
+                            "maintainers": "RIPE-NCC-HM-MNT",
+                            "description": "IPv4 address block not managed by the RIPE NCC"
+                          },
+                          {
+                            "start_ip": "1.0.0.0",
+                            "end_ip": "1.255.255.255",
+                            "version": 4,
+                            "registry": "apnic",
+                            "country_code": "AU",
+                            "country_raw": "AU",
+                            "name": "APNIC-AP",
+                            "status": "ALLOCATED PORTABLE",
+                            "last_modified": "2023-09-05T01:46:01Z",
+                            "source": "APNIC",
+                            "maintainers": "APNIC-HM",
+                            "organization": "ORG-APNI3-AP",
+                            "abuse_contact": "AA1452-AP",
+                            "description": "Asia Pacific Network Information Centre | Regional Internet Registry for the Asia-Pacific Region | 6 Cordelia Street | PO Box 3646 | South Brisbane, QLD 4101 | Australia"
+                          },
+                          {
+                            "start_ip": "0.0.0.0",
+                            "end_ip": "255.255.255.255",
+                            "version": 4,
+                            "registry": "afrinic",
+                            "country_raw": "EU # COUNTRY IS REALLY WORLD WIDE",
+                            "name": "IANA-BLK",
+                            "status": "ALLOCATED UNSPECIFIED",
+                            "source": "AFRINIC",
+                            "maintainers": "AFRINIC-HM-MNT",
+                            "organization": "ORG-IANA1-AFRINIC",
+                            "description": "The whole IPv4 address space"
+                          },
+                          {
+                            "start_ip": "0.0.0.0",
+                            "end_ip": "255.255.255.255",
+                            "version": 4,
+                            "registry": "apnic",
+                            "country_code": "AU",
+                            "country_raw": "AU",
+                            "name": "IANA-BLOCK",
+                            "status": "ALLOCATED PORTABLE",
+                            "last_modified": "2008-09-04T06:51:49Z",
+                            "source": "APNIC",
+                            "maintainers": "MAINT-APNIC-AP",
+                            "description": "General placeholder reference for all IPv4 addresses"
+                          },
+                          {
+                            "start_ip": "0.0.0.0",
+                            "end_ip": "255.255.255.255",
+                            "version": 4,
+                            "registry": "ripe",
+                            "country_raw": "EU # COUNTRY FIELD IS ACTUALLY ALL COUNTRIES IN THE WORLD AND NOT JUST EU COUNTRIES",
+                            "name": "IANA-BLK",
+                            "status": "ALLOCATED UNSPECIFIED",
+                            "created": "2002-06-25T14:19:09Z",
+                            "last_modified": "2018-11-23T10:30:34Z",
+                            "source": "RIPE",
+                            "maintainers": "RIPE-NCC-HM-MNT",
+                            "organization": "ORG-IANA1-RIPE",
+                            "description": "The whole IPv4 address space"
+                          }
+                        ],
+                        "routes": [
+                          {
+                            "start_ip": "1.1.1.0",
+                            "end_ip": "1.1.1.255",
+                            "version": 4,
+                            "registry": "apnic",
+                            "cidr": "1.1.1.0/24",
+                            "asn": "AS13335",
+                            "as_number": 13335,
+                            "source": "APNIC",
+                            "maintainers": "MAINT-APNICRANDNET",
+                            "description": "APNIC Research and Development"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "tags": [
+          "IP lookup"
+        ],
+        "operationId": "lookupIpAddress",
+        "description": "Returns the compact BGP/allocation/geofeed lookup object for one IPv4 or IPv6 address. Add details=full to include the matched candidate records used to build the compact response."
+      }
     }
   },
   "components": {
@@ -707,7 +655,7 @@
           ],
           "example": "full"
         },
-        "description": "Set to full on /v1/ip/{address} to include matched allocation, route, and geofeed candidate records. Omit it for the compact response."
+        "description": "Set to full on /v1/ip?query={address} to include matched allocation, route, and geofeed candidate records. Omit it for the compact response."
       },
       "Limit": {
         "name": "limit",
@@ -1644,37 +1592,6 @@
           }
         ]
       },
-      "SearchResponse": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "ip",
-              "prefix",
-              "asn"
-            ]
-          },
-          "normalized": {
-            "type": "string"
-          },
-          "endpoint": {
-            "type": "string"
-          }
-        },
-        "description": "Normalized lookup query and canonical API endpoint.",
-        "examples": [
-          {
-            "query": "AS13335",
-            "type": "asn",
-            "normalized": "AS13335",
-            "endpoint": "/v1/asn/AS13335"
-          }
-        ]
-      },
       "HealthResponse": {
         "type": "object",
         "properties": {
@@ -1789,10 +1706,6 @@
     {
       "name": "ASN lookup",
       "description": "Return an aut-num record and paginated routes for an autonomous system."
-    },
-    {
-      "name": "Search",
-      "description": "Normalize a user-entered IP, CIDR, or ASN to a canonical API endpoint."
     },
     {
       "name": "Health",

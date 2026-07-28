@@ -120,7 +120,7 @@
 
   function ipQuery(ip) {
     if (!hasValue(ip) || !isIP(String(ip))) return "";
-    return queryButton(ip, `/v1/ip/${encodeURIComponent(ip)}`, "ip");
+    return queryButton(ip, `/v1/ip?query=${encodeURIComponent(ip)}`, "ip");
   }
 
   function rangeQuery(start, end, kind = "allocations") {
@@ -131,9 +131,9 @@
   }
 
   function routeHash(endpoint, kind = "resource") {
-    if (kind === "ip" || endpoint.startsWith("/v1/ip/")) {
-      const address = decodeURIComponent(endpoint.replace(/^\/v1\/ip\//, ""));
-      return `#ip/${encodeURIComponent(address)}`;
+    if (kind === "ip" || endpoint.startsWith("/v1/ip")) {
+      const address = new URL(endpoint, API).searchParams.get("query") || "";
+      return isIP(address) ? `#ip/${encodeURIComponent(address)}` : "#my-ip";
     }
     if (endpoint.startsWith("/v1/asn/")) {
       const asn = decodeURIComponent(endpoint.replace(/^\/v1\/asn\//, "").split("?")[0]);
@@ -172,7 +172,7 @@
     const hash = window.location.hash || "#my-ip";
     if (hash === "#" || hash === "#home") return { redirect: "#my-ip" };
     if (hash === "#api") return { page: "api" };
-    if (/^#api-(?:ip|prefix|range|asn|search)$/.test(hash)) {
+    if (/^#api-(?:ip|prefix|range|asn)$/.test(hash)) {
       return { page: "api", anchor: hash.slice(1) };
     }
     if (hash === "#my-ip") return { page: "lookup", kind: "self", endpoint: "", inputValue: "" };
@@ -180,7 +180,7 @@
     if (hash.startsWith("#ip/")) {
       const address = decodeURIComponent(hash.slice(4));
       return isIP(address)
-        ? { page: "lookup", kind: "ip", endpoint: `/v1/ip/${encodeURIComponent(address)}`, inputValue: address }
+        ? { page: "lookup", kind: "ip", endpoint: `/v1/ip?query=${encodeURIComponent(address)}`, inputValue: address }
         : { redirect: "#my-ip" };
     }
 
@@ -681,7 +681,7 @@
   }
 
   function classifyQuery(value) {
-    if (isIP(value)) return { kind: "ip", endpoint: `/v1/ip/${encodeURIComponent(value)}` };
+    if (isIP(value)) return { kind: "ip", endpoint: `/v1/ip?query=${encodeURIComponent(value)}` };
     if (/^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(value)) return { kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(value)}` };
     if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn/${encodeURIComponent(value)}` };
     const match = value.match(/^\s*([^\s]+)\s+-\s+([^\s]+)\s*$/);
@@ -713,7 +713,7 @@
       if (!data || !isIPv4(data.ip)) {
         throw new Error("Unable to determine your IPv4 address. Try again.");
       }
-      await lookupEndpoint(`/v1/ip/${encodeURIComponent(data.ip)}`, "self", data.ip, controller);
+      await lookupEndpoint(`/v1/ip?query=${encodeURIComponent(data.ip)}`, "self", data.ip, controller);
     } catch (error) {
       if (controller.signal.aborted && activeLookup !== controller) return;
       renderError("Unable to determine your IPv4 address. Try again.");
@@ -802,7 +802,7 @@
   currentButton.addEventListener("click", () => navigateToHash("#my-ip"));
   ipv6Button.addEventListener("click", () => {
     if (ipv6Button.dataset.ip) {
-      navigateToEndpoint(`/v1/ip/${encodeURIComponent(ipv6Button.dataset.ip)}`, "ip");
+      navigateToEndpoint(`/v1/ip?query=${encodeURIComponent(ipv6Button.dataset.ip)}`, "ip");
     }
   });
 
