@@ -115,7 +115,7 @@
   function asnQuery(asn) {
     if (!hasValue(asn)) return "";
     const query = String(asn).split(",")[0].trim();
-    return queryButton(asn, `/v1/asn/${encodeURIComponent(query)}`);
+    return queryButton(asn, `/v1/asn?query=${encodeURIComponent(query)}`);
   }
 
   function ipQuery(ip) {
@@ -135,9 +135,9 @@
       const address = new URL(endpoint, API).searchParams.get("query") || "";
       return isIP(address) ? `#ip/${encodeURIComponent(address)}` : "#my-ip";
     }
-    if (endpoint.startsWith("/v1/asn/")) {
-      const asn = decodeURIComponent(endpoint.replace(/^\/v1\/asn\//, "").split("?")[0]);
-      return `#asn/${encodeURIComponent(asn)}`;
+    if (endpoint.startsWith("/v1/asn")) {
+      const asn = new URL(endpoint, API).searchParams.get("query") || "";
+      return /^(?:AS)?[1-9][0-9]*$/i.test(asn) ? `#asn/${encodeURIComponent(asn)}` : "#my-ip";
     }
     if (endpoint.startsWith("/v1/prefix")) {
       const url = new URL(endpoint, API);
@@ -194,7 +194,7 @@
     if (hash.startsWith("#asn/")) {
       const asn = decodeURIComponent(hash.slice(5));
       return /^(?:AS)?[1-9][0-9]*$/i.test(asn)
-        ? { page: "lookup", kind: "asn", endpoint: `/v1/asn/${encodeURIComponent(asn)}`, inputValue: asn }
+        ? { page: "lookup", kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(asn)}`, inputValue: asn }
         : { redirect: "#my-ip" };
     }
 
@@ -683,7 +683,7 @@
   function classifyQuery(value) {
     if (isIP(value)) return { kind: "ip", endpoint: `/v1/ip?query=${encodeURIComponent(value)}` };
     if (/^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(value)) return { kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(value)}` };
-    if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn/${encodeURIComponent(value)}` };
+    if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(value)}` };
     const match = value.match(/^\s*([^\s]+)\s+-\s+([^\s]+)\s*$/);
     if (match && isIP(match[1]) && isIP(match[2])) {
       return { kind: "range", endpoint: `/v1/range?start=${encodeURIComponent(match[1])}&end=${encodeURIComponent(match[2])}` };

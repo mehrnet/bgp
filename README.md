@@ -72,7 +72,7 @@ Useful endpoints:
 - `GET /v1/ip?query={address}&details=full`
 - `GET /v1/prefix?prefix={cidr}`
 - `GET /v1/range?start={ip}&end={ip}&kind=allocations|routes`
-- `GET /v1/asn/{asn}`
+- `GET /v1/asn?query={asn}`
 - `GET /v1/health`
 
 The public API documentation is also available inside the site at `#api`.
