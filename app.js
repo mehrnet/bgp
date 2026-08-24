@@ -84,10 +84,17 @@
   }
 
   function normalizedASN(network) {
-    if (Array.isArray(network.asns) && network.asns.length) {
-      return network.asns.join(", ");
-    }
-    return network.asn || "";
+    return networkASNs(network).join(", ");
+  }
+
+  function networkASNs(network) {
+    const values = Array.isArray(network.asns) && network.asns.length
+      ? network.asns
+      : [network.asn];
+    return [...new Set(values
+      .flatMap((value) => String(value || "").split(","))
+      .map((value) => value.trim())
+      .filter((value) => /^(?:AS)?[1-9][0-9]*$/i.test(value)))];
   }
 
   function addressRange(start, end) {
@@ -107,8 +114,19 @@
 
   function asnQuery(asn) {
     if (!hasValue(asn)) return "";
-    const query = String(asn).split(",")[0].trim();
-    return queryButton(asn, `/v1/asn?query=${encodeURIComponent(query)}`);
+    const query = String(asn).trim();
+    return queryButton(query, `/v1/asn?query=${encodeURIComponent(query)}`);
+  }
+
+  function asnQueries(asns) {
+    const values = Array.isArray(asns)
+      ? asns
+      : String(asns || "").split(",");
+    return values
+      .map((value) => String(value).trim())
+      .filter((value) => /^(?:AS)?[1-9][0-9]*$/i.test(value))
+      .map(asnQuery)
+      .join('<span class="query-separator">, </span>');
   }
 
   function ipQuery(ip) {
@@ -414,7 +432,7 @@
     const resultLabel = kind === "self" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
     const subtitleParts = [
-      hasValue(asn) ? asnQuery(asn) : "",
+      hasValue(asn) ? asnQueries(networkASNs(network)) : "",
       hasValue(network.cidr) ? prefixQuery(network.cidr) : ""
     ].filter(hasValue);
     const asSubtitle = subtitleParts.join('<span class="query-separator"> - </span>');
