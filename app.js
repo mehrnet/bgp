@@ -90,13 +90,6 @@
     return network.asn || "";
   }
 
-  function joinedLocation(location, fallbackCountry) {
-    const parts = [location.city, location.region, location.country_code || fallbackCountry]
-      .filter(hasValue)
-      .map(String);
-    return [...new Set(parts)].join(", ");
-  }
-
   function addressRange(start, end) {
     if (!hasValue(start) || !hasValue(end)) return "";
     return `${start} - ${end}`;
@@ -354,22 +347,6 @@
     });
   }
 
-  function valueOrUnavailable(value, leadingIcon = "", valueHtml = "") {
-    if (!hasValue(value)) {
-      return '<span class="quick-value muted">Not available</span>';
-    }
-    const className = leadingIcon ? "quick-value location-value" : "quick-value";
-    return `<span class="${className}">${leadingIcon}${valueHtml || escapeHtml(value)}</span>`;
-  }
-
-  function quickFact(label, value, iconName, leadingIcon = "", valueHtml = "") {
-    return `
-      <div class="quick-fact">
-        <span class="quick-heading">${icon(iconName)}<span class="record-label">${escapeHtml(label)}</span></span>
-        ${valueOrUnavailable(value, leadingIcon, valueHtml)}
-      </div>`;
-  }
-
   function recordRows(fields) {
     return fields
       .filter((field) => hasValue(field.value))
@@ -382,7 +359,13 @@
   }
 
   function recordPanel(title, fields, iconName) {
-    const rows = fields.filter((field) => hasValue(field.value));
+    const seenLabels = new Set();
+    const rows = fields.filter((field) => {
+      const label = String(field.label).toLowerCase();
+      if (!hasValue(field.value) || seenLabels.has(label)) return false;
+      seenLabels.add(label);
+      return true;
+    });
     if (!rows.length) return "";
     return `
       <section class="record-panel">
@@ -393,24 +376,11 @@
       </section>`;
   }
 
-  function sourcePanel(sources) {
-    const rows = [
-      ["RIR allocation", sources.allocation],
-      ["BGP route", sources.route],
-      ["Geofeed", sources.geofeed]
-    ].map(([name, present]) => `
-      <div class="source-row" data-present="${Boolean(present)}">
-        <span class="source-name">${name}</span>
-        <span class="source-state">${present ? "Matched" : "No match"}</span>
-      </div>`).join("");
-
-    return `
-      <section class="record-panel">
-        <header class="record-panel-header">
-          <span class="record-heading">${icon("database")}<h3>Data coverage</h3></span>
-        </header>
-        <div class="source-list">${rows}</div>
-      </section>`;
+  function recordGrid(...panels) {
+    const content = panels.filter(hasValue);
+    if (!content.length) return "";
+    const className = content.length === 1 ? "record-grid record-grid-single" : "record-grid";
+    return `<div class="${className}">${content.join("")}</div>`;
   }
 
   function renderLoading() {
@@ -436,12 +406,10 @@
     const network = data.network || {};
     const allocation = data.allocation || {};
     const location = data.location || {};
-    const sources = data.sources || {};
     const asn = normalizedASN(network);
     const country = location.country_code || allocation.country_code || data.country_code || "";
     const registry = data.registry || allocation.registry || "";
     const networkName = network.name || allocation.name || "Unidentified network";
-    const locationName = joinedLocation(location, country);
     const protocol = hasValue(data.version) ? `IPv${data.version}` : "";
     const resultLabel = kind === "self" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
@@ -453,26 +421,20 @@
     const flag = countryFlag(country);
 
     const routeFields = [
-      { label: "Prefix", value: network.cidr, html: prefixQuery(network.cidr) },
-      { label: "Origin ASN", value: asn, html: asnQuery(asn) },
-      { label: "AS number", value: network.as_number },
-      { label: "Network name", value: network.name },
-      { label: "Start address", value: network.start_ip, html: ipQuery(network.start_ip) },
-      { label: "End address", value: network.end_ip, html: ipQuery(network.end_ip) },
-      { label: "Route status", value: network.status }
+      { label: "Route status", value: network.status },
+      { label: "Abuse contact", value: network.abuse_contact },
+      ...metadataFields(network, ["Registry"])
     ];
 
     const allocationFields = [
-      { label: "Registry", value: allocation.registry || data.registry },
-      { label: "Name", value: allocation.name },
-      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
-      { label: "Country", value: allocation.country_code || allocation.country_raw },
+      { label: "Allocation range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
+      { label: "Registered country", value: allocation.country_code || allocation.country_raw },
       { label: "Allocated", value: data.allocation_date || allocation.allocation_date },
-      { label: "Status", value: allocationStatus }
+      { label: "Abuse contact", value: allocation.abuse_contact },
+      ...metadataFields(allocation, ["Registry"])
     ];
 
     const locationFields = [
-      { label: "Country", value: location.country_code },
       { label: "Region", value: location.region },
       { label: "City", value: location.city }
     ];
@@ -502,19 +464,11 @@
         </div>
       </section>
 
-      <section class="quick-facts" aria-label="Key network facts">
-        ${quickFact("Origin ASN", asn, "network", "", asnQuery(asn))}
-        ${quickFact("Route prefix", network.cidr, "route", "", prefixQuery(network.cidr))}
-        ${quickFact("Registry", hasValue(registry) ? String(registry).toUpperCase() : "", "registry")}
-        ${quickFact("Location", locationName, "map-pin", flag)}
-      </section>
-
-      <div class="record-grid">
-        ${recordPanel("BGP route", routeFields, "route")}
-        ${recordPanel("Allocation", allocationFields, "registry")}
-        ${recordPanel("Geolocation", locationFields, "map-pin")}
-        ${sourcePanel(sources)}
-      </div>`;
+      ${recordGrid(
+        recordPanel("BGP route", routeFields, "route"),
+        recordPanel("Allocation", allocationFields, "registry"),
+        recordPanel("Geolocation", locationFields, "map-pin")
+      )}`;
 
     result.querySelector("[data-copy]").addEventListener("click", async (event) => {
       try {
@@ -527,7 +481,8 @@
     bindResultControls();
   }
 
-  function metadataFields(object) {
+  function metadataFields(object, omittedLabels = []) {
+    const omitted = new Set(omittedLabels.map((label) => String(label).toLowerCase()));
     return [
       { label: "Registry", value: object.registry },
       { label: "Source", value: object.source },
@@ -536,7 +491,7 @@
       { label: "Description", value: object.description },
       { label: "Created", value: object.created },
       { label: "Last modified", value: object.last_modified }
-    ];
+    ].filter((field) => !omitted.has(field.label.toLowerCase()));
   }
 
   function objectList(title, objects, iconName, type) {
@@ -576,10 +531,10 @@
     const prefix = data.prefix || {};
     const allocation = data.allocation || {};
     const routes = data.routes || { items: [] };
-    const country = allocation.country_code || "";
-    const flag = countryFlag(country);
+    const queryRange = addressRange(prefix.start_ip, prefix.end_ip);
+    const allocationRange = addressRange(allocation.start_ip, allocation.end_ip);
     const allocationFields = [
-      { label: "Range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
+      { label: "Allocation range", value: allocationRange !== queryRange ? allocationRange : "", html: rangeQuery(allocation.start_ip, allocation.end_ip) },
       { label: "Registry", value: allocation.registry },
       { label: "Network name", value: allocation.name },
       { label: "Country", value: allocation.country_code || allocation.country_raw },
@@ -597,7 +552,6 @@
           <div class="identity-meta">
             ${hasValue(prefix.version) ? `<span class="meta-chip accent">IPv${escapeHtml(prefix.version)}</span>` : ""}
             ${hasValue(prefix.prefix_length) ? `<span class="meta-chip">/${escapeHtml(prefix.prefix_length)}</span>` : ""}
-            ${hasValue(country) ? `<span class="meta-chip with-flag">${flag}${escapeHtml(country)}</span>` : ""}
           </div>
         </div>
         <div class="network-block">
@@ -606,10 +560,10 @@
           <span class="network-subtitle">${rangeQuery(prefix.start_ip, prefix.end_ip) || escapeHtml(addressRange(prefix.start_ip, prefix.end_ip))}</span>
         </div>
       </section>
-      <div class="record-grid">
-        ${recordPanel("Allocation", allocationFields, "registry")}
-        ${objectList("Registered route objects", routes.items, "route", "route")}
-      </div>
+      ${recordGrid(
+        recordPanel("Allocation", allocationFields, "registry"),
+        objectList("Registered route objects", routes.items, "route", "route")
+      )}
       ${paginationControl(endpoint, routes.next_cursor)}`;
     bindResultControls();
   }
@@ -635,14 +589,12 @@
           <strong>${escapeHtml(rangeValue.address_count || "")}</strong>
         </div>
       </section>
-      <div class="record-grid">
-        ${objectList(kind === "routes" ? "Registered route objects" : "Allocation records", objects, kind === "routes" ? "route" : "registry", kind === "routes" ? "route" : "allocation")}
-      </div>
+      ${recordGrid(objectList(kind === "routes" ? "Registered route objects" : "Allocation records", objects, kind === "routes" ? "route" : "registry", kind === "routes" ? "route" : "allocation"))}
       ${paginationControl(endpoint, data.next_cursor)}`;
     bindResultControls();
   }
 
-  function summaryFacetList(title, facets, iconName, type) {
+  function summaryFacetList(title, facets, iconName, type, sourceRecordCount, sourceLabel) {
     if (!Array.isArray(facets) || !facets.length) return "";
     const rows = facets.map((facet) => {
       const value = String(facet.value || "");
@@ -652,7 +604,10 @@
     }).join("");
     return `
       <section class="record-panel object-panel">
-        <header class="record-panel-header"><span class="record-heading">${icon(iconName)}<h3>${escapeHtml(title)}</h3></span></header>
+        <header class="record-panel-header">
+          <span class="record-heading">${icon(iconName)}<h3>${escapeHtml(title)}</h3></span>
+          <span class="panel-support">${escapeHtml(sourceRecordCount || 0)} ${escapeHtml(sourceLabel)} records</span>
+        </header>
         <div class="object-list">${rows}</div>
       </section>`;
   }
@@ -674,29 +629,25 @@
           <span class="network-subtitle">Precomputed from ${escapeHtml(summary.buckets || 0)} /${escapeHtml(summary.bucket_prefix_length || 0)} buckets</span>
         </div>
       </section>
-      <section class="quick-facts" aria-label="Range summary facts">
-        ${quickFact("Allocation records", summary.allocation_records, "registry")}
-        ${quickFact("Route records", summary.route_records, "route")}
-        ${quickFact("Summary buckets", summary.buckets, "network")}
-        ${quickFact("Bucket resolution", `/${summary.bucket_prefix_length || 0}`, "route")}
-      </section>
-      <div class="record-grid">
-        ${summaryFacetList("Top countries", summary.countries, "map-pin", "country")}
-        ${summaryFacetList("Top origin ASNs", summary.asns, "network", "asn")}
-      </div>`;
+      ${recordGrid(
+        summaryFacetList("Top countries", summary.countries, "map-pin", "country", summary.allocation_records, "allocation"),
+        summaryFacetList("Top origin ASNs", summary.asns, "network", "asn", summary.route_records, "route")
+      )}`;
     bindResultControls();
   }
 
   function renderASNResult(data, endpoint) {
     const autnum = data.autnum || {};
     const routes = data.routes || { items: [] };
+    const registeredName = autnum.name || autnum.organization || "No aut-num record";
+    const registeredOrganization = autnum.organization && autnum.organization !== autnum.name
+      ? autnum.organization
+      : "";
     const autnumFields = [
-      { label: "Name", value: autnum.name },
       { label: "Registry", value: autnum.registry },
-      { label: "Country", value: autnum.country_code || autnum.country_raw },
-      { label: "Organization", value: autnum.organization },
       { label: "Status", value: autnum.status },
-      ...metadataFields(autnum)
+      { label: "Abuse contact", value: autnum.abuse_contact },
+      ...metadataFields(autnum, ["Organization"])
     ];
     result.removeAttribute("aria-busy");
     result.innerHTML = `
@@ -704,18 +655,20 @@
         <div class="address-block">
           <span class="section-label">${icon("network")}Autonomous system</span>
           <div class="address-line"><h2>${asnQuery(data.asn) || escapeHtml(data.asn || "ASN")}</h2></div>
-          <div class="identity-meta"><span class="meta-chip accent">AS${escapeHtml(data.as_number || "")}</span></div>
+          <div class="identity-meta">
+            ${hasValue(autnum.country_code) ? `<span class="meta-chip with-flag">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
+          </div>
         </div>
         <div class="network-block">
           <span class="section-label">${icon("registry")}Registered identity</span>
-          <strong>${escapeHtml(autnum.name || autnum.organization || "No aut-num record")}</strong>
-          ${hasValue(autnum.country_code) ? `<span class="network-subtitle with-flag-subtitle">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
+          <strong>${escapeHtml(registeredName)}</strong>
+          ${hasValue(registeredOrganization) ? `<span class="network-subtitle">${escapeHtml(registeredOrganization)}</span>` : ""}
         </div>
       </section>
-      <div class="record-grid">
-        ${recordPanel("Aut-num record", autnumFields, "registry")}
-        ${objectList("Registered route objects", routes.items, "route", "route")}
-      </div>
+      ${recordGrid(
+        recordPanel("Aut-num record", autnumFields, "registry"),
+        objectList("Registered route objects", routes.items, "route", "route")
+      )}
       ${paginationControl(endpoint, routes.next_cursor)}`;
     bindResultControls();
   }
