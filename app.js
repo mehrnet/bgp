@@ -617,6 +617,10 @@
   function renderRangeResult(data, endpoint) {
     const rangeValue = data.range || {};
     const kind = data.kind || "allocations";
+    if (data.mode === "summary" && data.summary) {
+      renderRangeSummary(data);
+      return;
+    }
     const objects = kind === "routes" ? data.routes : data.allocations;
     result.removeAttribute("aria-busy");
     result.innerHTML = `
@@ -635,6 +639,51 @@
         ${objectList(kind === "routes" ? "Registered route objects" : "Allocation records", objects, kind === "routes" ? "route" : "registry", kind === "routes" ? "route" : "allocation")}
       </div>
       ${paginationControl(endpoint, data.next_cursor)}`;
+    bindResultControls();
+  }
+
+  function summaryFacetList(title, facets, iconName, type) {
+    if (!Array.isArray(facets) || !facets.length) return "";
+    const rows = facets.map((facet) => {
+      const value = String(facet.value || "");
+      const country = type === "country" ? countryFlag(value) : "";
+      const primary = type === "asn" ? asnQuery(value) : `${country}${escapeHtml(value)}`;
+      return `<article class="object-row"><strong>${primary}</strong><span>${escapeHtml(facet.record_count)} source records</span></article>`;
+    }).join("");
+    return `
+      <section class="record-panel object-panel">
+        <header class="record-panel-header"><span class="record-heading">${icon(iconName)}<h3>${escapeHtml(title)}</h3></span></header>
+        <div class="object-list">${rows}</div>
+      </section>`;
+  }
+
+  function renderRangeSummary(data) {
+    const rangeValue = data.range || {};
+    const summary = data.summary || {};
+    result.removeAttribute("aria-busy");
+    result.innerHTML = `
+      <section class="result-identity">
+        <div class="address-block">
+          <span class="section-label">${icon("route")}Range summary</span>
+          <div class="address-line"><h2>${rangeQuery(rangeValue.start_ip, rangeValue.end_ip) || escapeHtml(addressRange(rangeValue.start_ip, rangeValue.end_ip))}</h2></div>
+          <div class="identity-meta">${hasValue(rangeValue.version) ? `<span class="meta-chip accent">IPv${escapeHtml(rangeValue.version)}</span>` : ""}</div>
+        </div>
+        <div class="network-block">
+          <span class="section-label">${icon("network")}Address space</span>
+          <strong>${escapeHtml(rangeValue.address_count || "")}</strong>
+          <span class="network-subtitle">Precomputed from ${escapeHtml(summary.buckets || 0)} /${escapeHtml(summary.bucket_prefix_length || 0)} buckets</span>
+        </div>
+      </section>
+      <section class="quick-facts" aria-label="Range summary facts">
+        ${quickFact("Allocation records", summary.allocation_records, "registry")}
+        ${quickFact("Route records", summary.route_records, "route")}
+        ${quickFact("Summary buckets", summary.buckets, "network")}
+        ${quickFact("Bucket resolution", `/${summary.bucket_prefix_length || 0}`, "route")}
+      </section>
+      <div class="record-grid">
+        ${summaryFacetList("Top countries", summary.countries, "map-pin", "country")}
+        ${summaryFacetList("Top origin ASNs", summary.asns, "network", "asn")}
+      </div>`;
     bindResultControls();
   }
 

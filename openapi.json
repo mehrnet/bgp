@@ -158,7 +158,7 @@
               ],
               "default": "allocations"
             },
-            "description": "Choose allocations for RIR allocation objects or routes for registered route objects."
+            "description": "Choose allocations for RIR allocation objects or routes for registered route objects. Generated summary responses retain both allocation and route aggregate fields."
           },
           {
             "$ref": "#/components/parameters/Limit"
@@ -169,7 +169,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Overlapping allocation or route records",
+            "description": "Cursor-paginated overlapping objects, or a generated summary for canonical IPv4 ranges from /0 through /16.",
             "content": {
               "application/json": {
                 "schema": {
@@ -194,6 +194,7 @@
                         "address_count": "256"
                       },
                       "kind": "routes",
+                      "mode": "records",
                       "routes": [
                         {
                           "prefix": "1.1.1.0/24",
@@ -208,6 +209,29 @@
                           "description": "APNIC Research and Development"
                         }
                       ],
+                      "next_cursor": null
+                    }
+                  },
+                  "summary": {
+                    "summary": "Generated summary for a canonical IPv4 /8 range",
+                    "value": {
+                      "range": {
+                        "start_ip": "80.0.0.0",
+                        "end_ip": "80.255.255.255",
+                        "version": 4,
+                        "address_count": "16777216"
+                      },
+                      "kind": "allocations",
+                      "mode": "summary",
+                      "summary": {
+                        "aggregation": "overlapping_source_records",
+                        "bucket_prefix_length": 8,
+                        "buckets": 1,
+                        "allocation_records": 24,
+                        "route_records": 132,
+                        "countries": [{"value": "GB", "record_count": 11}],
+                        "asns": [{"value": "AS123", "record_count": 22}]
+                      },
                       "next_cursor": null
                     }
                   }
@@ -1225,6 +1249,16 @@
               "routes"
             ]
           },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "records",
+              "summary"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RangeSummary"
+          },
           "allocations": {
             "type": "array",
             "items": {
@@ -1244,7 +1278,7 @@
             ]
           }
         },
-        "description": "Allocation or route records overlapping an explicit IP range.",
+        "description": "Allocation or route records overlapping an explicit IP range. Canonical IPv4 ranges from /0 through /16 return a generated summary instead of object pages.",
         "examples": [
           {
             "meta": {
@@ -1262,6 +1296,7 @@
               "address_count": "256"
             },
             "kind": "routes",
+            "mode": "records",
             "routes": [
               {
                 "prefix": "1.1.1.0/24",
@@ -1279,6 +1314,58 @@
             "next_cursor": null
           }
         ]
+      },
+      "RangeSummary": {
+        "type": "object",
+        "required": [
+          "aggregation",
+          "bucket_prefix_length",
+          "buckets",
+          "allocation_records",
+          "route_records",
+          "countries",
+          "asns"
+        ],
+        "properties": {
+          "aggregation": {
+            "type": "string",
+            "enum": ["overlapping_source_records"]
+          },
+          "bucket_prefix_length": {
+            "type": "integer",
+            "enum": [0, 8, 16]
+          },
+          "buckets": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "allocation_records": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "route_records": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "countries": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/RangeFacet"}
+          },
+          "asns": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/RangeFacet"}
+          }
+        },
+        "description": "Precomputed source-record aggregate. Counts are not unique-address coverage figures."
+      },
+      "RangeFacet": {
+        "type": "object",
+        "required": ["value", "record_count"],
+        "properties": {
+          "value": {"type": "string"},
+          "record_count": {"type": "integer", "format": "int64"}
+        }
       },
       "ASNResponse": {
         "type": "object",
