@@ -590,9 +590,10 @@
         </button>`);
     }
 
-    const itemSummary = Number.isInteger(totalItems) && totalItems >= 0
+    const routeLabel = Number.isInteger(totalItems) && totalItems >= 0
       ? `${totalItems} registered route${totalItems === 1 ? "" : "s"}`
       : "Registered routes";
+    const itemSummary = `${routeLabel} | Page ${page} of ${totalPages}`;
     return `
       <nav class="route-pagination" aria-label="Registered route pages">
         <span class="pagination-summary">${escapeHtml(itemSummary)}</span>
