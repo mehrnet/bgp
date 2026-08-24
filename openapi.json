@@ -1688,7 +1688,7 @@
   },
   "externalDocs": {
     "description": "Public API documentation",
-    "url": "https://bgp.mehrnet.com/#api"
+    "url": "https://bgp.mehrnet.com/api"
   },
   "tags": [
     {

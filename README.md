@@ -75,4 +75,6 @@ Useful endpoints:
 - `GET /v1/asn?query={asn}`
 - `GET /v1/health`
 
-The public API documentation is also available inside the site at `#api`.
+The public API documentation is available at `/api`. Browser routes use
+pathname URLs, including `/my-ip`, `/ip/{address}`, `/cidr/{prefix}`,
+`/range?start={ip}&end={ip}`, and `/asn/{asn}`.

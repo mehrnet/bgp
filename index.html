@@ -4,23 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f1417">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20260727-0330">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260727-0330">
   <meta name="description" content="MehrNet BGP IP, CIDR, range, and ASN intelligence lookup.">
   <title>MehrNet BGP</title>
-  <link rel="stylesheet" href="style.css?v=20260727-1200">
+  <link rel="stylesheet" href="/style.css?v=20260727-1200">
 </head>
 <body>
   <header class="nav">
     <div class="nav-inner">
-      <a class="brand" href="#my-ip" aria-label="MehrNet BGP home">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg>
+      <a class="brand" href="/my-ip" data-route aria-label="MehrNet BGP home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg>
         <span class="brand-copy">
           <span class="brand-name">mehr<span>bgp</span></span>
           <span class="brand-byline">by mehrnet</span>
         </span>
       </a>
-      <a class="api-link" href="#api">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>
+      <a class="api-link" href="/api" data-route>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-book-open"></use></svg>
         <span>API documentation</span>
       </a>
     </div>
@@ -36,16 +36,16 @@
     <section class="lookup-tools" aria-label="Network lookup">
       <form class="lookup-form" id="lookup-form" novalidate>
         <label class="search-field" for="ip-input">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-search"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-search"></use></svg>
           <span class="sr-only">IP address, CIDR, range, or AS number</span>
           <input id="ip-input" name="ip" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" placeholder="IP address, CIDR, range, or AS number">
         </label>
         <button class="primary-button" type="submit">
           <span>Lookup</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-arrow-right"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-arrow-right"></use></svg>
         </button>
         <button class="secondary-button" type="button" id="current-button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-target"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-target"></use></svg>
           <span>My IP</span>
         </button>
       </form>
@@ -58,7 +58,7 @@
         </span>
         <span class="ipv6-action">
           View IPv6
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-arrow-right"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-arrow-right"></use></svg>
         </span>
       </button>
     </section>
@@ -79,48 +79,48 @@
       </header>
 
       <section class="api-overview" aria-label="API base URL">
-        <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-globe"></use></svg>Base URL</span>
+        <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-globe"></use></svg>Base URL</span>
         <code>https://bgp-api.mehrnet.com</code>
         <span>No key, no client library. Lookup responses include <code>meta.dataset</code> so every answer can be traced to its source build.</span>
         <a class="openapi-link" href="/openapi.json?v=20260728-1100">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-book-open"></use></svg>
           <span>OpenAPI JSON</span>
         </a>
       </section>
 
       <section class="api-section" aria-labelledby="endpoints-title">
         <div class="api-section-heading">
-          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-terminal"></use></svg>Endpoints</span>
+          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-terminal"></use></svg>Endpoints</span>
           <h2 id="endpoints-title">Lookup resources</h2>
         </div>
         <nav class="api-endpoints" aria-label="API endpoint directory">
-          <a href="#api-ip"><span class="endpoint-method">GET</span><code>/v1/ip?query={address}</code><span>IPv4 or IPv6 address</span></a>
-          <a href="#api-prefix"><span class="endpoint-method">GET</span><code>/v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></a>
-          <a href="#api-range"><span class="endpoint-method">GET</span><code>/v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations or routes</span></a>
-          <a href="#api-asn"><span class="endpoint-method">GET</span><code>/v1/asn?query={asn}</code><span>Aut-num record and registered routes</span></a>
+          <a href="/api/ip" data-route><span class="endpoint-method">GET</span><code>/v1/ip?query={address}</code><span>IPv4 or IPv6 address</span></a>
+          <a href="/api/prefix" data-route><span class="endpoint-method">GET</span><code>/v1/prefix?prefix={cidr}</code><span>Allocation and registered route objects</span></a>
+          <a href="/api/range" data-route><span class="endpoint-method">GET</span><code>/v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations or routes</span></a>
+          <a href="/api/asn" data-route><span class="endpoint-method">GET</span><code>/v1/asn?query={asn}</code><span>Aut-num record and registered routes</span></a>
         </nav>
         <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. IP lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
       </section>
 
       <section class="api-section" aria-labelledby="examples-title">
         <div class="api-section-heading">
-          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-book-open"></use></svg>Services</span>
+          <span class="section-label"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-book-open"></use></svg>Services</span>
           <h2 id="examples-title">What Mehr BGP provides</h2>
         </div>
         <div class="api-language-bar">
           <span>Example language</span>
           <div class="language-tabs" role="group" aria-label="API example language">
-            <button class="language-tab" type="button" aria-pressed="true" data-language-tab="curl"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-curl"></use></svg><span>cURL</span></button>
-            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="javascript"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-javascript"></use></svg><span>JavaScript</span></button>
-            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="php"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-php"></use></svg><span>PHP</span></button>
-            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="python"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-python"></use></svg><span>Python</span></button>
-            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="go"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-language-go"></use></svg><span>Go</span></button>
+            <button class="language-tab" type="button" aria-pressed="true" data-language-tab="curl"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-language-curl"></use></svg><span>cURL</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="javascript"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-language-javascript"></use></svg><span>JavaScript</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="php"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-language-php"></use></svg><span>PHP</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="python"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-language-python"></use></svg><span>Python</span></button>
+            <button class="language-tab" type="button" aria-pressed="false" data-language-tab="go"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-language-go"></use></svg><span>Go</span></button>
           </div>
         </div>
         <div class="api-examples">
           <article class="api-example lookup-example" id="api-ip">
             <header class="api-example-header">
-              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="/icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>IP address lookup</h3>
                 <p>Resolve one IPv4 or IPv6 address into its best matching route, allocation, ASN, and location.</p>
@@ -176,7 +176,7 @@ data = json.<span class="token function">load</span>(<span class="token function
 
           <article class="api-example lookup-example" id="api-prefix">
             <header class="api-example-header">
-              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="/icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>CIDR prefix lookup</h3>
                 <p>Inspect the allocation covering a prefix and the registered route objects that overlap it.</p>
@@ -237,7 +237,7 @@ data = json.<span class="token function">load</span>(<span class="token function
 
           <article class="api-example lookup-example" id="api-range">
             <header class="api-example-header">
-              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="/icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>Range lookup</h3>
                 <p>Find allocations or route objects that overlap a start and end address.</p>
@@ -304,7 +304,7 @@ data = json.<span class="token function">load</span>(<span class="token function
 
           <article class="api-example lookup-example" id="api-asn">
             <header class="api-example-header">
-              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
+              <span class="api-waypoint" aria-hidden="true"><svg viewBox="0 0 32 32"><use href="/icons.svg?v=20260727-0500#icon-bgp-mark"></use></svg></span>
               <div>
                 <h3>ASN lookup</h3>
                 <p>Fetch an autonomous system record with its registered route objects.</p>
@@ -367,10 +367,10 @@ data = json.<span class="token function">load</span>(<span class="token function
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <template id="code-copy-template">
     <button class="code-copy-button" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="icons.svg?v=20260727-0500#icon-copy"></use></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="/icons.svg?v=20260727-0500#icon-copy"></use></svg>
       <span>Copy</span>
     </button>
   </template>
-  <script src="app.js?v=20260728-1100"></script>
+  <script src="/app.js?v=20260824-1230"></script>
 </body>
 </html>

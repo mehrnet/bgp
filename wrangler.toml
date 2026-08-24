@@ -4,6 +4,7 @@ workers_dev = false
 
 [assets]
 directory = "."
+# Return the static app for browser routes such as /my-ip and /api.
 not_found_handling = "single-page-application"
 
 [[routes]]

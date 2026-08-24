@@ -2,7 +2,7 @@
   "use strict";
 
   const API = "https://bgp-api.mehrnet.com";
-  const ICON_SPRITE = "icons.svg?v=20260727-0500";
+  const ICON_SPRITE = "/icons.svg?v=20260727-0500";
   const homeView = document.querySelector("#home-view");
   const apiView = document.querySelector("#api-view");
   const apiLink = document.querySelector(".api-link");
@@ -130,19 +130,19 @@
     return queryButton(label, endpoint);
   }
 
-  function routeHash(endpoint, kind = "resource") {
+  function routePath(endpoint, kind = "resource") {
     if (kind === "ip" || endpoint.startsWith("/v1/ip")) {
       const address = new URL(endpoint, API).searchParams.get("query") || "";
-      return isIP(address) ? `#ip/${encodeURIComponent(address)}` : "#my-ip";
+      return isIP(address) ? `/ip/${encodeURIComponent(address)}` : "/my-ip";
     }
     if (endpoint.startsWith("/v1/asn")) {
       const asn = new URL(endpoint, API).searchParams.get("query") || "";
-      return /^(?:AS)?[1-9][0-9]*$/i.test(asn) ? `#asn/${encodeURIComponent(asn)}` : "#my-ip";
+      return /^(?:AS)?[1-9][0-9]*$/i.test(asn) ? `/asn/${encodeURIComponent(asn)}` : "/my-ip";
     }
     if (endpoint.startsWith("/v1/prefix")) {
       const url = new URL(endpoint, API);
       const prefix = url.searchParams.get("prefix") || "";
-      return prefix ? `#cidr/${encodeURIComponent(prefix)}` : "#my-ip";
+      return prefix ? `/cidr/${encodeURIComponent(prefix)}` : "/my-ip";
     }
     if (endpoint.startsWith("/v1/range")) {
       const url = new URL(endpoint, API);
@@ -151,55 +151,67 @@
         const value = url.searchParams.get(key);
         if (value) params.set(key, value);
       });
-      return params.has("start") && params.has("end") ? `#range?${params.toString()}` : "#my-ip";
+      return params.has("start") && params.has("end") ? `/range?${params.toString()}` : "/my-ip";
     }
-    return "#my-ip";
+    return "/my-ip";
   }
 
-  function navigateToHash(hash) {
-    if (window.location.hash === hash) {
+  function navigateToPath(path) {
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+    if (currentPath === path) {
       renderRoute();
       return;
     }
-    window.location.hash = hash;
+    window.history.pushState(null, "", path);
+    renderRoute();
   }
 
   function navigateToEndpoint(endpoint, kind = "resource") {
-    navigateToHash(routeHash(endpoint, kind));
+    navigateToPath(routePath(endpoint, kind));
   }
 
-  function parseRouteHash() {
-    const hash = window.location.hash || "#my-ip";
-    if (hash === "#" || hash === "#home") return { redirect: "#my-ip" };
-    if (hash === "#api") return { page: "api" };
-    if (/^#api-(?:ip|prefix|range|asn)$/.test(hash)) {
-      return { page: "api", anchor: hash.slice(1) };
+  function decodePathSegment(value) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return "";
     }
-    if (hash === "#my-ip") return { page: "lookup", kind: "self", endpoint: "", inputValue: "" };
+  }
 
-    if (hash.startsWith("#ip/")) {
-      const address = decodeURIComponent(hash.slice(4));
+  function parseRoutePath() {
+    const path = window.location.pathname;
+    const segments = path.split("/").filter(Boolean);
+    if (path === "/" || path === "/home") return { redirect: "/my-ip" };
+    if (path === "/api") return { page: "api" };
+    if (segments.length === 2 && segments[0] === "api" && /^(ip|prefix|range|asn)$/.test(segments[1])) {
+      return { page: "api", anchor: `api-${segments[1]}` };
+    }
+    if (path === "/my-ip") return { page: "lookup", kind: "self", endpoint: "", inputValue: "" };
+
+    if (segments.length === 2 && segments[0] === "ip") {
+      const address = decodePathSegment(segments[1]);
       return isIP(address)
         ? { page: "lookup", kind: "ip", endpoint: `/v1/ip?query=${encodeURIComponent(address)}`, inputValue: address }
-        : { redirect: "#my-ip" };
+        : { redirect: "/my-ip" };
     }
 
-    if (hash.startsWith("#cidr/")) {
-      const cidr = decodeURIComponent(hash.slice(6));
+    if (path.startsWith("/cidr/")) {
+      // Browsers may normalize an encoded CIDR slash, so accept both forms.
+      const cidr = decodePathSegment(path.slice("/cidr/".length));
       return /^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(cidr)
         ? { page: "lookup", kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(cidr)}`, inputValue: cidr }
-        : { redirect: "#my-ip" };
+        : { redirect: "/my-ip" };
     }
 
-    if (hash.startsWith("#asn/")) {
-      const asn = decodeURIComponent(hash.slice(5));
+    if (segments.length === 2 && segments[0] === "asn") {
+      const asn = decodePathSegment(segments[1]);
       return /^(?:AS)?[1-9][0-9]*$/i.test(asn)
         ? { page: "lookup", kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(asn)}`, inputValue: asn }
-        : { redirect: "#my-ip" };
+        : { redirect: "/my-ip" };
     }
 
-    if (hash.startsWith("#range?")) {
-      const params = new URLSearchParams(hash.slice(7));
+    if (path === "/range") {
+      const params = new URLSearchParams(window.location.search);
       const start = params.get("start") || "";
       const end = params.get("end") || "";
       const kind = params.get("kind") === "routes" ? "routes" : "";
@@ -207,10 +219,10 @@
         const endpoint = `/v1/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}${kind ? "&kind=routes" : ""}`;
         return { page: "lookup", kind: "range", endpoint, inputValue: addressRange(start, end) };
       }
-      return { redirect: "#my-ip" };
+      return { redirect: "/my-ip" };
     }
 
-    return { redirect: "#my-ip" };
+    return { redirect: "/my-ip" };
   }
 
   function setLookupError(message = "") {
@@ -228,7 +240,7 @@
   }
 
   function renderRoute() {
-    const route = parseRouteHash();
+    const route = parseRoutePath();
     if (route.redirect) {
       window.history.replaceState(null, "", route.redirect);
       renderRoute();
@@ -799,7 +811,14 @@
     navigateToEndpoint(lookupQuery.endpoint, lookupQuery.kind);
   });
 
-  currentButton.addEventListener("click", () => navigateToHash("#my-ip"));
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[data-route]");
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    navigateToPath(link.getAttribute("href"));
+  });
+
+  currentButton.addEventListener("click", () => navigateToPath("/my-ip"));
   ipv6Button.addEventListener("click", () => {
     if (ipv6Button.dataset.ip) {
       navigateToEndpoint(`/v1/ip?query=${encodeURIComponent(ipv6Button.dataset.ip)}`, "ip");
@@ -808,9 +827,6 @@
 
   bindCodeCopyButtons();
   bindApiExampleTabs();
-  window.addEventListener("hashchange", renderRoute);
-  if (!window.location.hash) {
-    window.history.replaceState(null, "", "#my-ip");
-  }
+  window.addEventListener("popstate", renderRoute);
   renderRoute();
 })();
