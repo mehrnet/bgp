@@ -99,7 +99,7 @@
           <a href="/api/range" data-route><span class="endpoint-method">GET</span><code>/v1/range?start={ip}&amp;end={ip}</code><span>Overlapping allocations or routes</span></a>
           <a href="/api/asn" data-route><span class="endpoint-method">GET</span><code>/v1/asn?query={asn}</code><span>Aut-num record and registered routes</span></a>
         </nav>
-        <p class="api-note">Prefix, range, and ASN endpoints accept <code>limit</code> from 1 to 100 and return <code>next_cursor</code> when another page is available. IP lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
+        <p class="api-note">Prefix and range endpoints use cursor pagination. ASN lookup also accepts numbered <code>page</code> results with a total count. IP lookups accept <code>details=full</code> when raw matched records are needed. Direct RPSL <code>abuse-c</code> and <code>abuse-mailbox</code> values are returned as <code>abuse_contact</code> when present in the daily dataset.</p>
       </section>
 
       <section class="api-section" aria-labelledby="examples-title">
@@ -311,7 +311,7 @@ data = json.<span class="token function">load</span>(<span class="token function
               </div>
             </header>
             <div class="api-service-body">
-              <p>ASN lookup returns the retained aut-num object and a paginated route list. It accepts both <code>AS13335</code> and <code>13335</code>.</p>
+              <p>ASN lookup returns the retained aut-num object and registered route objects. It accepts both <code>AS13335</code> and <code>13335</code>; use <code>page</code> for numbered results.</p>
               <p class="api-endpoint-line"><span>GET</span><code>/v1/asn?query={asn}</code></p>
               <section class="api-parameters" aria-labelledby="api-asn-parameters">
                 <h4 id="api-asn-parameters">Parameters</h4>
@@ -321,7 +321,8 @@ data = json.<span class="token function">load</span>(<span class="token function
                     <tbody>
                       <tr><th scope="row"><code>query</code></th><td>Query</td><td>Yes</td><td>AS number with or without <code>AS</code>.</td></tr>
                       <tr><th scope="row"><code>limit</code></th><td>Query</td><td>No</td><td>1-100 routes.</td></tr>
-                      <tr><th scope="row"><code>cursor</code></th><td>Query</td><td>No</td><td>Continuation cursor.</td></tr>
+                      <tr><th scope="row"><code>page</code></th><td>Query</td><td>No</td><td>Numbered page from 1 to 100000. Do not combine with <code>cursor</code>.</td></tr>
+                      <tr><th scope="row"><code>cursor</code></th><td>Query</td><td>No</td><td>Legacy continuation cursor. Do not combine with <code>page</code>.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -329,16 +330,16 @@ data = json.<span class="token function">load</span>(<span class="token function
               </section>
             </div>
             <div class="api-operation">
-            <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10"</span></code></pre></div>
-            <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10"</span>);
+            <div class="api-code-panel" data-language-panel="curl" data-language="cURL"><div class="api-code-actions"></div><pre class="api-code" tabindex="0" aria-label="ASN lookup request example"><code><span class="token command">curl</span> <span class="token flag">-sS</span> <span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10&amp;page=1"</span></code></pre></div>
+            <div class="api-code-panel" data-language-panel="javascript" data-language="JavaScript" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">const</span> response = <span class="token keyword">await</span> <span class="token function">fetch</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10&amp;page=1"</span>);
 <span class="token keyword">const</span> data = <span class="token keyword">await</span> response.<span class="token function">json</span>();</code></pre></div>
-            <div class="api-code-panel" data-language-panel="php" data-language="PHP" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">$json</span> = <span class="token function">file_get_contents</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10"</span>);
+            <div class="api-code-panel" data-language-panel="php" data-language="PHP" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">$json</span> = <span class="token function">file_get_contents</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10&amp;page=1"</span>);
 <span class="token variable">$data</span> = <span class="token function">json_decode</span>(<span class="token variable">$json</span>, <span class="token boolean">true</span>);</code></pre></div>
             <div class="api-code-panel" data-language-panel="python" data-language="Python" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token keyword">from</span> urllib.request <span class="token keyword">import</span> urlopen
 <span class="token keyword">import</span> json
 
-data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10"</span>))</code></pre></div>
-            <div class="api-code-panel" data-language-panel="go" data-language="Go" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">resp</span>, <span class="token variable">err</span> := <span class="token function">http.Get</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10"</span>)
+data = json.<span class="token function">load</span>(<span class="token function">urlopen</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10&amp;page=1"</span>))</code></pre></div>
+            <div class="api-code-panel" data-language-panel="go" data-language="Go" hidden><div class="api-code-actions"></div><pre class="api-code"><code><span class="token variable">resp</span>, <span class="token variable">err</span> := <span class="token function">http.Get</span>(<span class="token string">"https://bgp-api.mehrnet.com/v1/asn?query=AS13335&amp;limit=10&amp;page=1"</span>)
 <span class="token keyword">if</span> <span class="token variable">err</span> != <span class="token constant">nil</span> {
   <span class="token function">log.Fatal</span>(<span class="token variable">err</span>)
 }
@@ -352,7 +353,8 @@ data = json.<span class="token function">load</span>(<span class="token function
   <span class="token property">"autnum"</span><span class="token punctuation">: {</span><span class="token property">"name"</span><span class="token punctuation">: </span><span class="token string">"CLOUDFLARENET-AS"</span><span class="token punctuation">, </span><span class="token property">"registry"</span><span class="token punctuation">: </span><span class="token string">"arin"</span><span class="token punctuation">, </span><span class="token property">"source"</span><span class="token punctuation">: </span><span class="token string">"ARIN"</span><span class="token punctuation">},</span>
   <span class="token property">"routes"</span><span class="token punctuation">: {</span>
     <span class="token property">"items"</span><span class="token punctuation">: [{</span><span class="token property">"prefix"</span><span class="token punctuation">: </span><span class="token string">"197.234.240.0/22"</span><span class="token punctuation">, </span><span class="token property">"origin_asn"</span><span class="token punctuation">: </span><span class="token string">"AS13335"</span><span class="token punctuation">, </span><span class="token property">"version"</span><span class="token punctuation">: </span><span class="token number">4</span><span class="token punctuation">}],</span>
-    <span class="token property">"next_cursor"</span><span class="token punctuation">: </span><span class="token string">"87810"</span>
+    <span class="token property">"next_cursor"</span><span class="token punctuation">: </span><span class="token constant">null</span><span class="token punctuation">,</span>
+    <span class="token property">"page"</span><span class="token punctuation">: </span><span class="token number">1</span><span class="token punctuation">, </span><span class="token property">"total_pages"</span><span class="token punctuation">: </span><span class="token number">6</span><span class="token punctuation">, </span><span class="token property">"total_items"</span><span class="token punctuation">: </span><span class="token number">58</span>
   <span class="token punctuation">}</span>
 <span class="token punctuation">}</span></code></pre></div>
             </div>

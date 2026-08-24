@@ -576,6 +576,17 @@
             "$ref": "#/components/parameters/Limit"
           },
           {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000,
+              "default": 1
+            },
+            "description": "Numbered route page. Cannot be combined with cursor."
+          },
+          {
             "$ref": "#/components/parameters/Cursor"
           }
         ],
@@ -644,7 +655,10 @@
                             "description": "Cloudflare, Inc. | 101 Townsend Street, San Francisco, California 94107, US"
                           }
                         ],
-                        "next_cursor": "87810"
+                        "next_cursor": null,
+                        "page": 1,
+                        "total_pages": 2,
+                        "total_items": 58
                       }
                     }
                   }
@@ -663,7 +677,7 @@
           "ASN lookup"
         ],
         "operationId": "lookupAsn",
-        "description": "Returns the retained aut-num object and route objects originated by the ASN. The query value accepts AS-prefixed and numeric forms."
+        "description": "Returns the retained aut-num object and route objects originated by the ASN. The query value accepts AS-prefixed and numeric forms. Use page for numbered route pagination, or cursor for the legacy keyset pagination mode."
       }
     }
   },
@@ -1501,6 +1515,19 @@
               "string",
               "null"
             ]
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_pages": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_items": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
       },

@@ -115,7 +115,7 @@
   function asnQuery(asn) {
     if (!hasValue(asn)) return "";
     const query = String(asn).trim();
-    return queryButton(query, `/v1/asn?query=${encodeURIComponent(query)}`);
+    return queryButton(query, `/v1/asn?query=${encodeURIComponent(query)}&page=1`);
   }
 
   function asnQueries(asns) {
@@ -217,7 +217,7 @@
     if (segments.length === 2 && segments[0] === "asn") {
       const asn = decodePathSegment(segments[1]);
       return /^(?:AS)?[1-9][0-9]*$/i.test(asn)
-        ? { page: "lookup", kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(asn)}`, inputValue: asn }
+        ? { page: "lookup", kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(asn)}&page=1`, inputValue: asn }
         : { redirect: "/my-ip" };
     }
 
@@ -545,6 +545,61 @@
     return `<button class="more-button" type="button" data-next-url="${escapeHtml(`${url.pathname}${url.search}`)}">More results ${icon("arrow-right")}</button>`;
   }
 
+  function asnPaginationControl(endpoint, routes) {
+    const currentPage = Number.parseInt(routes.page, 10);
+    const totalPages = Number.parseInt(routes.total_pages, 10);
+    const totalItems = Number.parseInt(routes.total_items, 10);
+    if (!Number.isInteger(currentPage) || !Number.isInteger(totalPages) || totalPages < 1) return "";
+
+    const page = Math.min(Math.max(currentPage, 1), totalPages);
+    const pageUrl = (targetPage) => {
+      const url = new URL(endpoint, API);
+      url.searchParams.delete("cursor");
+      url.searchParams.set("page", targetPage);
+      return escapeHtml(`${url.pathname}${url.search}`);
+    };
+    const pageButton = (targetPage) => `
+      <button class="pagination-page" type="button" data-page-url="${pageUrl(targetPage)}" aria-label="Page ${targetPage}">${targetPage}</button>`;
+    const controls = [];
+
+    if (page > 1) {
+      controls.push(`
+        <button class="pagination-control pagination-control-first" type="button" data-page-url="${pageUrl(1)}" aria-label="First page" title="First page">
+          <span class="pagination-double-icon" aria-hidden="true">${icon("arrow-right")}${icon("arrow-right")}</span>
+        </button>
+        <button class="pagination-control pagination-control-previous" type="button" data-page-url="${pageUrl(page - 1)}" aria-label="Previous page" title="Previous page">
+          ${icon("arrow-right")}
+        </button>`);
+    }
+
+    const firstPage = Math.max(1, page - 2);
+    const lastPage = Math.min(totalPages, page + 2);
+    for (let targetPage = firstPage; targetPage <= lastPage; targetPage += 1) {
+      controls.push(targetPage === page
+        ? `<span class="pagination-page is-current" aria-current="page" aria-label="Page ${targetPage}, current page">${targetPage}</span>`
+        : pageButton(targetPage));
+    }
+
+    if (page < totalPages) {
+      controls.push(`
+        <button class="pagination-control pagination-control-next" type="button" data-page-url="${pageUrl(page + 1)}" aria-label="Next page" title="Next page">
+          ${icon("arrow-right")}
+        </button>
+        <button class="pagination-control pagination-control-last" type="button" data-page-url="${pageUrl(totalPages)}" aria-label="Last page" title="Last page">
+          <span class="pagination-double-icon" aria-hidden="true">${icon("arrow-right")}${icon("arrow-right")}</span>
+        </button>`);
+    }
+
+    const itemSummary = Number.isInteger(totalItems) && totalItems >= 0
+      ? `${totalItems} registered route${totalItems === 1 ? "" : "s"}`
+      : "Registered routes";
+    return `
+      <nav class="route-pagination" aria-label="Registered route pages">
+        <span class="pagination-summary">${escapeHtml(itemSummary)}</span>
+        <span class="pagination-controls">${controls.join("")}</span>
+      </nav>`;
+  }
+
   function renderPrefixResult(data, endpoint) {
     const prefix = data.prefix || {};
     const allocation = data.allocation || {};
@@ -663,31 +718,28 @@
       : "";
     const autnumFields = [
       { label: "Registry", value: autnum.registry },
+      { label: "Country", value: autnum.country_code || autnum.country_raw },
       { label: "Status", value: autnum.status },
       { label: "Abuse contact", value: autnum.abuse_contact },
-      ...metadataFields(autnum, ["Organization"])
+      ...metadataFields(autnum, ["Registry", "Organization"])
     ];
+    const autnumRows = recordRows(autnumFields);
     result.removeAttribute("aria-busy");
     result.innerHTML = `
       <section class="result-identity">
         <div class="address-block">
           <span class="section-label">${icon("network")}Autonomous system</span>
           <div class="address-line"><h2>${asnQuery(data.asn) || escapeHtml(data.asn || "ASN")}</h2></div>
-          <div class="identity-meta">
-            ${hasValue(autnum.country_code) ? `<span class="meta-chip with-flag">${countryFlag(autnum.country_code)}${escapeHtml(autnum.country_code)}</span>` : ""}
-          </div>
         </div>
-        <div class="network-block">
+        <div class="network-block asn-identity-block">
           <span class="section-label">${icon("registry")}Registered identity</span>
           <strong>${escapeHtml(registeredName)}</strong>
           ${hasValue(registeredOrganization) ? `<span class="network-subtitle">${escapeHtml(registeredOrganization)}</span>` : ""}
+          ${autnumRows ? `<dl class="asn-detail-list">${autnumRows}</dl>` : ""}
         </div>
       </section>
-      ${recordGrid(
-        recordPanel("Aut-num record", autnumFields, "registry"),
-        objectList("Registered route objects", routes.items, "route", "route")
-      )}
-      ${paginationControl(endpoint, routes.next_cursor)}`;
+      ${recordGrid(objectList("Registered route objects", routes.items, "route", "route"))}
+      ${asnPaginationControl(endpoint, routes) || paginationControl(endpoint, routes.next_cursor)}`;
     bindResultControls();
   }
 
@@ -697,6 +749,9 @@
     });
     result.querySelectorAll("[data-next-url]").forEach((button) => {
       button.addEventListener("click", () => lookupEndpoint(button.dataset.nextUrl, "resource"));
+    });
+    result.querySelectorAll("[data-page-url]").forEach((button) => {
+      button.addEventListener("click", () => lookupEndpoint(button.dataset.pageUrl, "resource"));
     });
   }
 
@@ -715,7 +770,7 @@
   function classifyQuery(value) {
     if (isIP(value)) return { kind: "ip", endpoint: `/v1/ip?query=${encodeURIComponent(value)}` };
     if (/^[0-9a-fA-F:.]+\/[0-9]{1,3}$/.test(value)) return { kind: "prefix", endpoint: `/v1/prefix?prefix=${encodeURIComponent(value)}` };
-    if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(value)}` };
+    if (/^(?:AS)?[1-9][0-9]*$/i.test(value)) return { kind: "asn", endpoint: `/v1/asn?query=${encodeURIComponent(value)}&page=1` };
     const match = value.match(/^\s*([^\s]+)\s+-\s+([^\s]+)\s*$/);
     if (match && isIP(match[1]) && isIP(match[2])) {
       return { kind: "range", endpoint: `/v1/range?start=${encodeURIComponent(match[1])}&end=${encodeURIComponent(match[2])}` };
