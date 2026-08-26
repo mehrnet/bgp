@@ -1,0 +1,24 @@
+[Unit]
+Description=MehrNet BGP API (secondary update slot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bgpapi
+Group=bgpapi
+EnvironmentFile=/etc/bgp-api/bgp-api-secondary.env
+ExecStart=/usr/local/bin/bgp-api
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=30s
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/lib/bgp-api
+
+[Install]
+WantedBy=multi-user.target
