@@ -1116,6 +1116,19 @@ h1 {
   text-transform: uppercase;
 }
 
+.route-origin {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3125rem;
+  min-width: 0;
+}
+
+.route-origin-name {
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 650;
+}
+
 .asn-identity-block {
   justify-content: flex-start;
 }

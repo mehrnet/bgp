@@ -351,6 +351,14 @@
                         "asns": [
                           "AS13335"
                         ],
+                        "origins": [
+                          {
+                            "asn": "AS13335",
+                            "as_number": 13335,
+                            "name": "CLOUDFLARENET",
+                            "organization": "ORG-CLOUD14-ARIN"
+                          }
+                        ],
                         "as_number": 13335,
                         "status": null,
                         "abuse_contact": null
@@ -401,6 +409,14 @@
                         "asn": "AS13335",
                         "asns": [
                           "AS13335"
+                        ],
+                        "origins": [
+                          {
+                            "asn": "AS13335",
+                            "as_number": 13335,
+                            "name": "CLOUDFLARENET",
+                            "organization": "ORG-CLOUD14-ARIN"
+                          }
                         ],
                         "as_number": 13335,
                         "status": null,
@@ -861,8 +877,15 @@
               "asns": [
                 "AS13335"
               ],
+              "origins": [
+                {
+                  "asn": "AS13335",
+                  "as_number": 13335,
+                  "name": "CLOUDFLARENET",
+                  "organization": "ORG-CLOUD14-ARIN"
+                }
+              ],
               "as_number": 13335,
-              "name": "APNIC-LABS",
               "status": null,
               "abuse_contact": null
             },
@@ -921,6 +944,33 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "origins": {
+            "type": "array",
+            "description": "Registered aut-num identities for the selected route origins. A missing aut-num record has null name and organization values.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "asn": {
+                  "type": "string"
+                },
+                "as_number": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "organization": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
             }
           },
           "as_number": {

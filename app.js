@@ -83,10 +83,6 @@
     return value.includes(":") ? isIPv6(value) : isIPv4(value);
   }
 
-  function normalizedASN(network) {
-    return networkASNs(network).join(", ");
-  }
-
   function networkASNs(network) {
     const values = Array.isArray(network.asns) && network.asns.length
       ? network.asns
@@ -95,6 +91,21 @@
       .flatMap((value) => String(value || "").split(","))
       .map((value) => value.trim())
       .filter((value) => /^(?:AS)?[1-9][0-9]*$/i.test(value)))];
+  }
+
+  function routeOriginQueries(network) {
+    const identities = new Map();
+    if (Array.isArray(network.origins)) {
+      network.origins.forEach((origin) => {
+        const asn = String(origin?.asn || "").trim().toUpperCase();
+        if (/^AS[1-9][0-9]*$/.test(asn)) identities.set(asn, origin);
+      });
+    }
+    return networkASNs(network).map((asn) => {
+      const origin = identities.get(String(asn).toUpperCase());
+      const name = hasValue(origin?.name) ? `<span class="route-origin-name">${escapeHtml(origin.name)}</span>` : "";
+      return `<span class="route-origin">${asnQuery(asn)}${name}</span>`;
+    }).join("");
   }
 
   function addressRange(start, end) {
@@ -424,14 +435,14 @@
     const network = data.network || {};
     const allocation = data.allocation || {};
     const location = data.location || {};
-    const asn = normalizedASN(network);
     const country = location.country_code || allocation.country_code || data.country_code || "";
     const registry = data.registry || allocation.registry || "";
     const protocol = hasValue(data.version) ? `IPv${data.version}` : "";
     const resultLabel = kind === "self" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
     const routePrefix = hasValue(network.cidr) ? prefixQuery(network.cidr) : "";
-    const routeOrigins = hasValue(asn) ? asnQueries(networkASNs(network)) : "";
+    const originASNs = networkASNs(network);
+    const routeOrigins = routeOriginQueries(network);
     const flag = countryFlag(country);
 
     const routeFields = [
@@ -475,7 +486,7 @@
         <div class="network-block">
           <span class="section-label">${icon("network")}BGP route</span>
           <strong>${routePrefix || "No registered route"}</strong>
-          ${hasValue(routeOrigins) ? `<span class="network-subtitle"><span class="network-subtitle-label">Origin ASN${networkASNs(network).length === 1 ? "" : "s"}</span>${routeOrigins}</span>` : ""}
+          ${hasValue(routeOrigins) ? `<span class="network-subtitle"><span class="network-subtitle-label">Origin ASN${originASNs.length === 1 ? "" : "s"}</span>${routeOrigins}</span>` : ""}
         </div>
       </section>
 
