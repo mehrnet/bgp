@@ -427,15 +427,11 @@
     const asn = normalizedASN(network);
     const country = location.country_code || allocation.country_code || data.country_code || "";
     const registry = data.registry || allocation.registry || "";
-    const networkName = network.name || allocation.name || "Unidentified network";
     const protocol = hasValue(data.version) ? `IPv${data.version}` : "";
     const resultLabel = kind === "self" ? "Current connection" : "Lookup result";
     const allocationStatus = data.allocation_status || allocation.status || "";
-    const subtitleParts = [
-      hasValue(asn) ? asnQueries(networkASNs(network)) : "",
-      hasValue(network.cidr) ? prefixQuery(network.cidr) : ""
-    ].filter(hasValue);
-    const asSubtitle = subtitleParts.join('<span class="query-separator"> - </span>');
+    const routePrefix = hasValue(network.cidr) ? prefixQuery(network.cidr) : "";
+    const routeOrigins = hasValue(asn) ? asnQueries(networkASNs(network)) : "";
     const flag = countryFlag(country);
 
     const routeFields = [
@@ -445,6 +441,7 @@
     ];
 
     const allocationFields = [
+      { label: "Allocation netname", value: allocation.name },
       { label: "Allocation range", value: addressRange(allocation.start_ip, allocation.end_ip), html: rangeQuery(allocation.start_ip, allocation.end_ip) },
       { label: "Registered country", value: allocation.country_code || allocation.country_raw },
       { label: "Allocated", value: data.allocation_date || allocation.allocation_date },
@@ -476,9 +473,9 @@
           </div>
         </div>
         <div class="network-block">
-          <span class="section-label">${icon("network")}Network</span>
-          <strong>${escapeHtml(networkName)}</strong>
-          ${hasValue(asSubtitle) ? `<span class="network-subtitle">${asSubtitle}</span>` : ""}
+          <span class="section-label">${icon("network")}BGP route</span>
+          <strong>${routePrefix || "No registered route"}</strong>
+          ${hasValue(routeOrigins) ? `<span class="network-subtitle"><span class="network-subtitle-label">Origin ASN${networkASNs(network).length === 1 ? "" : "s"}</span>${routeOrigins}</span>` : ""}
         </div>
       </section>
 
