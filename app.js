@@ -829,7 +829,7 @@
           parse: async (response) => (await response.text()).trim()
         },
         {
-          url: "https://api4.ipify.org?format=json",
+          url: "https://api.ipify.org?format=json",
           parse: async (response) => (await response.json()).ip
         }
       ], isIPv4, controller.signal);
