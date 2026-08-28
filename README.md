@@ -2,7 +2,7 @@
 
 Static public interface for MehrNet BGP at `https://bgp.mehrnet.com`.
 
-This repository contains only the browser UI. The API, PostgreSQL producer,
+This repository contains only the browser UI. The API, bbolt dataset producer,
 release workflow, and production sync tooling live in
 [`mehrnet/bgp-api`](https://github.com/mehrnet/bgp-api).
 
@@ -10,19 +10,19 @@ release workflow, and production sync tooling live in
 
 - Shows the visitor's current IP information by default.
 - Supports direct lookup of IPv4 and IPv6 addresses.
-- Supports CIDR prefix lookups, address ranges, ASNs, and text search.
+- Supports CIDR prefix lookups, address ranges, and ASNs.
 - Links queryable values in the response so a prefix, range, or ASN can be
   opened directly.
 - Provides API documentation with examples for curl, JavaScript, PHP, Python,
   and Go.
 - Ships a static `openapi.json` file for the public API contract.
 
-The browser temporarily resolves its IPv4 and optional IPv6 addresses through
-IPify, then looks each address up through `bgp-api`. The dedicated responders
-are maintained separately in [`mehrnet/ip-api`](https://github.com/mehrnet/ip-api)
-and will replace IPify after `ipv4.mehrnet.com` and `ipv6.mehrnet.com` are
-deployed. A single HTTP request can only arrive over one IP family, so the
-separate IPv6 resolution remains necessary for dual-stack visitors.
+The browser resolves IPv4 through `ipv4.mehrnet.com` and optionally resolves
+IPv6 through `ipv6.mehrnet.com`, then looks each address up through `bgp-api`.
+The dedicated DNS-only responders are maintained in
+[`mehrnet/ip-api`](https://github.com/mehrnet/ip-api). A single HTTP request
+can only arrive over one IP family, so the separate IPv6 resolution remains
+necessary for dual-stack visitors.
 
 ## Files
 

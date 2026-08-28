@@ -790,18 +790,18 @@
     renderLoading();
 
     try {
-      const response = await fetch("https://api4.ipify.org?format=json", {
+      const response = await fetch("https://ipv4.mehrnet.com/", {
         signal: controller.signal,
-        headers: { Accept: "application/json" }
+        cache: "no-store"
       });
       if (!response.ok) {
         throw new Error("Unable to determine your IPv4 address. Try again.");
       }
-      const data = await response.json();
-      if (!data || !isIPv4(data.ip)) {
+      const address = (await response.text()).trim();
+      if (!isIPv4(address)) {
         throw new Error("Unable to determine your IPv4 address. Try again.");
       }
-      await lookupEndpoint(`/v1/ip?query=${encodeURIComponent(data.ip)}`, "self", data.ip, controller);
+      await lookupEndpoint(`/v1/ip?query=${encodeURIComponent(address)}`, "self", address, controller);
     } catch (error) {
       if (controller.signal.aborted && activeLookup !== controller) return;
       renderError("Unable to determine your IPv4 address. Try again.");
@@ -858,15 +858,15 @@
     const timeout = window.setTimeout(() => controller.abort(), 6000);
 
     try {
-      const response = await fetch("https://api6.ipify.org?format=json", {
+      const response = await fetch("https://ipv6.mehrnet.com/", {
         signal: controller.signal,
-        headers: { Accept: "application/json" }
+        cache: "no-store"
       });
       if (!response.ok) return;
-      const data = await response.json();
-      if (!data || !isIPv6(data.ip)) return;
-      ipv6Address.textContent = data.ip;
-      ipv6Button.dataset.ip = data.ip;
+      const address = (await response.text()).trim();
+      if (!isIPv6(address)) return;
+      ipv6Address.textContent = address;
+      ipv6Button.dataset.ip = address;
       ipv6Button.hidden = false;
     } catch {
       // An IPv4-only client cannot connect to the IPv6-only endpoint.
