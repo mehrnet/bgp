@@ -352,7 +352,6 @@
                           "AS13335"
                         ],
                         "as_number": 13335,
-                        "name": "APNIC-LABS",
                         "status": null,
                         "abuse_contact": null
                       },
@@ -404,7 +403,6 @@
                           "AS13335"
                         ],
                         "as_number": 13335,
-                        "name": "APNIC-LABS",
                         "status": null,
                         "abuse_contact": null
                       },
@@ -931,12 +929,6 @@
               "null"
             ]
           },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "status": {
             "type": [
               "string",
@@ -950,7 +942,7 @@
             ]
           }
         },
-        "description": "Best route/network match selected for the looked-up IP."
+        "description": "Most-specific registered route and origin ASN match selected for the looked-up IP. RIR allocation netnames are returned by allocation.name."
       },
       "Allocation": {
         "allOf": [
