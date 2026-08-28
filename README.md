@@ -17,9 +17,9 @@ release workflow, and production sync tooling live in
   and Go.
 - Ships a static `openapi.json` file for the public API contract.
 
-The browser resolves IPv4 through `ipv4.mehrnet.com` and optionally resolves
-IPv6 through `ipv6.mehrnet.com`, then looks each address up through `bgp-api`.
-The dedicated DNS-only responders are maintained in
+The browser races each MehrNet address-family responder against the matching
+IPify endpoint and uses the first valid answer, then looks the address up
+through `bgp-api`. The dedicated DNS-only responders are maintained in
 [`mehrnet/ip-api`](https://github.com/mehrnet/ip-api). A single HTTP request
 can only arrive over one IP family, so the separate IPv6 resolution remains
 necessary for dual-stack visitors.

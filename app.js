@@ -779,6 +779,39 @@
     return null;
   }
 
+  async function raceAddressProviders(providers, validate, parentSignal) {
+    const attempts = providers.map(({ url, parse }) => {
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      parentSignal.addEventListener("abort", cancel, { once: true });
+
+      const promise = fetch(url, {
+        signal: controller.signal,
+        cache: "no-store"
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Address provider returned HTTP ${response.status}.`);
+          return parse(response);
+        })
+        .then((address) => {
+          if (!validate(address)) throw new Error("Address provider returned an invalid address.");
+          return address;
+        })
+        .finally(() => parentSignal.removeEventListener("abort", cancel));
+
+      return { controller, promise };
+    });
+
+    try {
+      const address = await Promise.any(attempts.map(({ promise }) => promise));
+      attempts.forEach(({ controller }) => controller.abort());
+      return address;
+    } catch {
+      attempts.forEach(({ controller }) => controller.abort());
+      throw new Error("Unable to determine the current address.");
+    }
+  }
+
   async function lookupCurrentIPv4() {
     if (activeLookup) activeLookup.abort();
     const controller = new AbortController();
@@ -790,17 +823,16 @@
     renderLoading();
 
     try {
-      const response = await fetch("https://ipv4.mehrnet.com/", {
-        signal: controller.signal,
-        cache: "no-store"
-      });
-      if (!response.ok) {
-        throw new Error("Unable to determine your IPv4 address. Try again.");
-      }
-      const address = (await response.text()).trim();
-      if (!isIPv4(address)) {
-        throw new Error("Unable to determine your IPv4 address. Try again.");
-      }
+      const address = await raceAddressProviders([
+        {
+          url: "https://ipv4.mehrnet.com/",
+          parse: async (response) => (await response.text()).trim()
+        },
+        {
+          url: "https://api4.ipify.org?format=json",
+          parse: async (response) => (await response.json()).ip
+        }
+      ], isIPv4, controller.signal);
       await lookupEndpoint(`/v1/ip?query=${encodeURIComponent(address)}`, "self", address, controller);
     } catch (error) {
       if (controller.signal.aborted && activeLookup !== controller) return;
@@ -858,13 +890,16 @@
     const timeout = window.setTimeout(() => controller.abort(), 6000);
 
     try {
-      const response = await fetch("https://ipv6.mehrnet.com/", {
-        signal: controller.signal,
-        cache: "no-store"
-      });
-      if (!response.ok) return;
-      const address = (await response.text()).trim();
-      if (!isIPv6(address)) return;
+      const address = await raceAddressProviders([
+        {
+          url: "https://ipv6.mehrnet.com/",
+          parse: async (response) => (await response.text()).trim()
+        },
+        {
+          url: "https://api6.ipify.org?format=json",
+          parse: async (response) => (await response.json()).ip
+        }
+      ], isIPv6, controller.signal);
       ipv6Address.textContent = address;
       ipv6Button.dataset.ip = address;
       ipv6Button.hidden = false;
