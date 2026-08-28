@@ -279,12 +279,12 @@
     }
 
     apiLink.removeAttribute("aria-current");
-    if (!ipv6Initialized) {
-      ipv6Initialized = true;
-      detectIPv6();
-    }
     if (route.page === "lookup") {
       if (route.kind === "self") {
+        if (!ipv6Initialized) {
+          ipv6Initialized = true;
+          detectIPv6();
+        }
         lookupCurrentIPv4();
       } else {
         lookupEndpoint(route.endpoint, route.kind, route.inputValue);
