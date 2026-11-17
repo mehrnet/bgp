@@ -140,9 +140,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - format: bbolt
-            database: mehrnet_bgp.bbolt
-            asset: mehrnet_bgp_bbolt.tar.zst
+          - format: mmap
+            database: mehrnet_bgp.mmap
+            asset: mehrnet_bgp_mmap.tar.zst
           - format: sqlite
             database: mehrnet_bgp.db
             asset: mehrnet_bgp_sqlite.tar.zst
@@ -166,28 +166,27 @@ jobs:
           cat artifacts/routes_*.csv > final_data/routes.csv
           cat artifacts/autnums_*.csv > final_data/autnums.csv
           test -s final_data/geolocations.csv
-      - name: Build immutable bbolt database
-        if: matrix.format == 'bbolt'
+      - name: Build immutable mmap database
+        if: matrix.format == 'mmap'
         env:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          go build -trimpath -o build-bbolt-dataset ./cmd/build-bbolt-dataset
-          ./build-bbolt-dataset \
+          go build -trimpath -o build-mmap-dataset ./cmd/build-mmap-dataset
+          ./build-mmap-dataset \
             -input final_data \
-            -output mehrnet_bgp.bbolt \
+            -output mehrnet_bgp.mmap \
             -release-tag "$RELEASE_TAG" \
             -built-at "$DATASET_BUILT_AT" \
-            -source-commit "$GITHUB_SHA" \
-            -compact=true
-          test -s mehrnet_bgp.bbolt
-      - name: Validate bbolt runtime contract
-        if: matrix.format == 'bbolt'
+            -source-commit "$GITHUB_SHA"
+          test -s mehrnet_bgp.mmap
+      - name: Validate mmap runtime contract
+        if: matrix.format == 'mmap'
         env:
-          BGP_API_DATABASE_PATH: ${{ github.workspace }}/mehrnet_bgp.bbolt
+          BGP_API_DATABASE_PATH: ${{ github.workspace }}/mehrnet_bgp.mmap
           BGP_API_VALIDATE_ONLY: "1"
         run: |
-          go test ./internal/api ./internal/boltstore
+          go test ./internal/api ./internal/mmapstore
           go build -trimpath -o bgp-api ./cmd/bgp-api
           ./bgp-api
       - name: Build immutable SQLite database
@@ -401,7 +400,7 @@ jobs:
           for asset in \
             bgp-api-linux-amd64.tar.gz \
             bgp-api-linux-arm64.tar.gz \
-            mehrnet_bgp_bbolt.tar.zst \
+            mehrnet_bgp_mmap.tar.zst \
             mehrnet_bgp_sqlite.tar.zst \
             country.mncc \
             bgp-lite.mnl; do
@@ -414,7 +413,7 @@ jobs:
           cat > release/release-notes.md <<'EOF'
           Immutable, fully indexed MehrNet BGP datasets.
 
-          - `mehrnet_bgp_bbolt.tar.zst` contains the ready-to-query bbolt database. No import or index build is required on the API server.
+          - `mehrnet_bgp_mmap.tar.zst` contains the ready-to-query zero-copy mmap database. No import or index build is required on the API server.
           - `mehrnet_bgp_sqlite.tar.zst` contains the ready-to-query SQLite database for third-party users and offline inspection.
           - `country.mncc` is a tiny IP-to-country-code database (MNCC format) for bundling into clients; see `docs/country-database.md`.
           - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`workers/bgp-lite`).

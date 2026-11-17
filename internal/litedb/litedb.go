@@ -197,7 +197,7 @@ func normalizeTrim(s string) string {
 }
 
 // AddAutnum records an aut-num metadata entry (first record per ASNumber wins,
-// matching boltstore).
+// matching mmapstore).
 func (b *Builder) AddAutnum(in AutnumInput) bool {
 	if in.ASNumber == 0 {
 		return false

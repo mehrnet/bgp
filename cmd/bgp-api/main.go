@@ -28,32 +28,32 @@ var (
 func main() {
 	path := os.Getenv("BGP_API_DATABASE_PATH")
 	if path == "" {
-		path = "/var/lib/bgp-api/primary.bbolt"
+		path = "/var/lib/bgp-api/primary.mmap"
 	}
-	store, err := api.NewBboltRepository(path)
+	store, err := api.NewMmapRepository(path)
 	if err != nil {
-		log.Fatalf("open bbolt dataset: %v", err)
+		log.Fatalf("open mmap dataset: %v", err)
 	}
 	defer func() {
 		if err := store.Close(); err != nil {
-			log.Printf("close bbolt dataset: %v", err)
+			log.Printf("close mmap dataset: %v", err)
 		}
 	}()
 	if os.Getenv("BGP_API_VALIDATE_ONLY") == "1" {
 		metadata, err := store.DatasetMetadata(context.Background())
 		if err != nil {
-			log.Fatalf("validate bbolt dataset: %v", err)
+			log.Fatalf("validate mmap dataset: %v", err)
 		}
 		releaseTag := "unknown"
 		if metadata.ReleaseTag != nil {
 			releaseTag = *metadata.ReleaseTag
 		}
-		log.Printf("validated bbolt dataset %s", releaseTag)
+		log.Printf("validated mmap dataset %s", releaseTag)
 		return
 	}
 	databaseBytes, err := store.DatabaseSize()
 	if err != nil {
-		log.Fatalf("inspect bbolt dataset: %v", err)
+		log.Fatalf("inspect mmap dataset: %v", err)
 	}
 	selectorBytes, err := store.CompactSelectorBytes()
 	if err != nil {
@@ -134,7 +134,7 @@ func main() {
 		}
 		if received == syscall.SIGUSR2 {
 			if runtimeCacheControl {
-				releaseRuntimeCaches(store, runtimeCaches)
+				releaseRuntimeCaches(runtimeCaches)
 			} else {
 				log.Printf("ignoring SIGUSR2 because BGP_API_RUNTIME_CACHE_CONTROL is disabled")
 			}
@@ -149,10 +149,9 @@ func main() {
 	}
 }
 
-func releaseRuntimeCaches(store *api.BboltRepository, caches *api.RuntimeCacheController) {
-	selectorRelease := store.DropCompactSelectors()
+func releaseRuntimeCaches(caches *api.RuntimeCacheController) {
 	cacheRelease := caches.DisableAndClear()
-	log.Printf("released runtime caches: selectors=%.1f MiB compact_entries=%d compact=%.1f MiB resource_entries=%d resource=%.1f MiB", float64(selectorRelease.Bytes)/(1<<20), cacheRelease.CompactEntries, float64(cacheRelease.CompactBytes)/(1<<20), cacheRelease.ResourceEntries, float64(cacheRelease.ResourceBytes)/(1<<20))
+	log.Printf("released runtime caches: compact_entries=%d compact=%.1f MiB resource_entries=%d resource=%.1f MiB", cacheRelease.CompactEntries, float64(cacheRelease.CompactBytes)/(1<<20), cacheRelease.ResourceEntries, float64(cacheRelease.ResourceBytes)/(1<<20))
 	go func() {
 		runtime.GC()
 		debug.FreeOSMemory()
@@ -161,7 +160,7 @@ func releaseRuntimeCaches(store *api.BboltRepository, caches *api.RuntimeCacheCo
 }
 
 type runtimeCacheWarmer struct {
-	store   *api.BboltRepository
+	store   *api.MmapRepository
 	plan    cachePlan
 	mu      sync.Mutex
 	running bool
@@ -214,25 +213,25 @@ func (warmer *runtimeCacheWarmer) warm() error {
 		}
 	}
 	if warmer.plan.WarmDatasetPageCache {
-		log.Printf("warming %.1f GiB bbolt dataset through the kernel page cache", float64(warmer.plan.DatabaseBytes)/float64(gibibyte))
+		log.Printf("warming %.1f GiB mmap dataset through the kernel page cache", float64(warmer.plan.DatabaseBytes)/float64(gibibyte))
 		warmup, err := warmer.store.WarmDataset(context.Background())
 		if err != nil {
 			return err
 		}
 		if !warmup.AlreadyWarm {
-			log.Printf("warmed %.1f GiB bbolt dataset through the kernel page cache", float64(warmup.Bytes)/float64(gibibyte))
+			log.Printf("warmed %.1f GiB mmap dataset through the kernel page cache", float64(warmup.Bytes)/float64(gibibyte))
 		}
 	}
 	return nil
 }
 
-func preloadCompactSelectors(store *api.BboltRepository) error {
+func preloadCompactSelectors(store *api.MmapRepository) error {
 	started := time.Now()
 	preload, err := store.PreloadCompactSelectors()
 	if err != nil {
 		return err
 	}
-	log.Printf("preloaded %.1f MiB of compact IP selectors in %s", float64(preload.Bytes)/(1<<20), time.Since(started).Round(time.Millisecond))
+	log.Printf("warmed %.1f MiB of compact LPM selectors into the page cache in %s", float64(preload.Bytes)/(1<<20), time.Since(started).Round(time.Millisecond))
 	return nil
 }
 

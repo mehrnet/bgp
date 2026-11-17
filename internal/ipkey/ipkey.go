@@ -21,7 +21,7 @@ type Parsed struct {
 	SortKey   string
 }
 
-// RuntimeIP is the normalized address representation used by the bbolt API
+// RuntimeIP is the normalized address representation used by the API
 // request path. Unlike Parsed, it deliberately has no decimal sort key.
 type RuntimeIP struct {
 	Address   netip.Addr
@@ -51,7 +51,7 @@ type ParsedRange struct {
 }
 
 // SummaryPrefixKeys returns a canonical IPv4 summary prefix from /0 through
-// /16. The generated bbolt dataset materializes every prefix in that interval,
+// /16. The generated dataset materializes every prefix in that interval,
 // so a broad range summary is one lookup.
 func SummaryPrefixKeys(value ParsedRange) ([]string, bool) {
 	if value.Version != 4 {

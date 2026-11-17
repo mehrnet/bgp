@@ -281,7 +281,7 @@ func NewWithRuntime(repository Repository, config Config) (http.Handler, *Runtim
 }
 
 func health(writer http.ResponseWriter, request *http.Request, repository Repository, config Config) {
-	response := HealthResponse{OK: true, Service: "bgp-api", Version: 1, Database: "bbolt"}
+	response := HealthResponse{OK: true, Service: "bgp-api", Version: 1, Database: "mmap"}
 	response.Build = buildInfo(config.Build)
 	if config.RuntimeCacheControl {
 		response.Runtime = &RuntimeInfo{CacheControl: true}
@@ -336,7 +336,7 @@ func lookupPrefix(writer http.ResponseWriter, request *http.Request, repository 
 	}
 	response, err := resources.LookupPrefix(request.Context(), prefix, page)
 	if err != nil {
-		if errors.Is(err, errBboltQueryTooBroad) {
+		if errors.Is(err, errQueryTooBroad) {
 			writeError(writer, http.StatusUnprocessableEntity, "QUERY_TOO_BROAD", "prefix matches too many source records; request a narrower prefix")
 			return
 		}
@@ -416,7 +416,7 @@ func lookupRange(writer http.ResponseWriter, request *http.Request, repository R
 			writeError(writer, http.StatusBadRequest, "INVALID_CURSOR", "cursor is invalid for this range lookup")
 			return
 		}
-		if errors.Is(err, errBboltQueryTooBroad) {
+		if errors.Is(err, errQueryTooBroad) {
 			writeError(writer, http.StatusUnprocessableEntity, "QUERY_TOO_BROAD", "range matches too many source records; use a canonical IPv4 CIDR from /0 through /16 for a generated summary, or request a narrower range")
 			return
 		}

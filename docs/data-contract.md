@@ -2,7 +2,7 @@
 
 Two public endpoints share this response contract:
 
-- **Full API** (`https://bgp-api.mehrnet.com`): backed by the full `mehrnet_bgp.bbolt` database with every raw RIR, IRR, and geofeed field.
+- **Full API** (`https://bgp-api.mehrnet.com`): backed by the full `mehrnet_bgp.mmap` database (`MNMF` format) with every raw RIR, IRR, and geofeed field.
 - **Lite API** (`https://bgp-lite.mehrnet.com`): serverless Cloudflare Worker backed by `bgp-lite.mnl` (`MNL1` format) with zero external database calls. It serves `/v1/health`, `/v1/ip`, `/v1/country`, `/v1/asn`, and `/v1/prefix` using the same schema, keeping `autnum` contacts (`abuse_contact`, `maintainers`, `description`), `/32` IPv4 & `/64` IPv6 allocations, and geofeed `country_code`/`region`/`city` while omitting `?details=full`, `/v1/range`, allocation `netname`/`abuse_contact`/`allocation_date`, and per-route IRR prose (`null`).
 
 `GET /v1/ip?query={address}` returns a single, stable shape. Values unavailable in the
