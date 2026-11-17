@@ -24,6 +24,12 @@ type DB struct {
 	registries []string
 	statuses   []string
 	sources    []string
+	regions    []string
+	cities     []string
+
+	geoLocCount      int
+	geoLocOffsetsOff int
+	geoLocDataOff    int
 
 	asnCount      int
 	asnNumbersOff int
@@ -68,6 +74,8 @@ type IPResult struct {
 	AllocEnd    netip.Addr
 	HasAlloc    bool
 	GeoCC       string
+	GeoRegion   string
+	GeoCity     string
 	HasGeo      bool
 	HasRoute    bool
 	RoutePrefix netip.Prefix
@@ -184,6 +192,26 @@ func Open(data []byte) (*DB, error) {
 	if db.sources, pos, err = readStringDict(data, pos); err != nil {
 		return nil, err
 	}
+	if db.regions, pos, err = readStringDict(data, pos); err != nil {
+		return nil, err
+	}
+	if db.cities, pos, err = readStringDict(data, pos); err != nil {
+		return nil, err
+	}
+
+	if pos+4 > len(data) {
+		return nil, ErrFormat
+	}
+	db.geoLocCount = int(binary.LittleEndian.Uint32(data[pos:]))
+	pos += 4
+	db.geoLocOffsetsOff = pos
+	pos += (db.geoLocCount + 1) * 4
+	if pos > len(data) {
+		return nil, ErrFormat
+	}
+	db.geoLocDataOff = pos
+	geoLocDataLen := int(binary.LittleEndian.Uint32(data[db.geoLocOffsetsOff+db.geoLocCount*4:]))
+	pos += geoLocDataLen
 
 	if pos+4 > len(data) {
 		return nil, ErrFormat
@@ -485,10 +513,22 @@ func (db *DB) LookupIP(addr netip.Addr) IPResult {
 		}
 	}
 	if _, _, _, pStart, pEnd, ok := db.findSeg(geoTable, allocKey, db.skipGeo); ok {
-		ccID, _, ok1 := readUvarintAt(db.data, pStart, pEnd)
-		if ok1 && ccID != 0 {
-			res.HasGeo = true
-			res.GeoCC = db.country(ccID)
+		locID, _, ok1 := readUvarintAt(db.data, pStart, pEnd)
+		if ok1 && locID != 0 && int(locID) <= db.geoLocCount {
+			idx := int(locID) - 1
+			off := db.geoLocDataOff + int(binary.LittleEndian.Uint32(db.data[db.geoLocOffsetsOff+idx*4:]))
+			end := db.geoLocDataOff + int(binary.LittleEndian.Uint32(db.data[db.geoLocOffsetsOff+(idx+1)*4:]))
+			if end <= len(db.data) {
+				ccID, p1, okA := readUvarintAt(db.data, off, end)
+				regID, p2, okB := readUvarintAt(db.data, p1, end)
+				cityID, _, okC := readUvarintAt(db.data, p2, end)
+				if okA && okB && okC {
+					res.HasGeo = true
+					res.GeoCC = db.country(ccID)
+					res.GeoRegion = dictAt(db.regions, regID)
+					res.GeoCity = dictAt(db.cities, cityID)
+				}
+			}
 		}
 	}
 	if _, _, _, pStart, pEnd, ok := db.findSeg(routeTable, routeKey, db.skipRoute); ok && pStart < pEnd {

@@ -80,7 +80,7 @@ export class LiteDB {
       bytes[1] !== 0x4e || // N
       bytes[2] !== 0x4c || // L
       bytes[3] !== 0x31 || // 1
-      bytes[4] !== 1
+      bytes[4] !== 2
     ) {
       throw new Error("invalid MNL1 header");
     }
@@ -106,6 +106,15 @@ export class LiteDB {
     [this.registries, pos] = readStringDict(bytes, pos);
     [this.statuses, pos] = readStringDict(bytes, pos);
     [this.sources, pos] = readStringDict(bytes, pos);
+    [this.regions, pos] = readStringDict(bytes, pos);
+    [this.cities, pos] = readStringDict(bytes, pos);
+
+    this.geoLocCount = view.getUint32(pos, true);
+    pos += 4;
+    this.geoLocOffsetsOff = pos;
+    pos += (this.geoLocCount + 1) * 4;
+    this.geoLocDataOff = pos;
+    pos += view.getUint32(this.geoLocOffsetsOff + this.geoLocCount * 4, true);
 
     this.asnCount = view.getUint32(pos, true);
     pos += 4;
@@ -291,12 +300,25 @@ export class LiteDB {
 
     let hasGeo = false;
     let geoCC = null;
+    let geoRegion = null;
+    let geoCity = null;
     const geoSeg = this.findSeg(geoTable, allocKey, skipGeo);
     if (geoSeg) {
       const r1 = readUvarint(this.bytes, geoSeg.pStart, geoSeg.pEnd);
-      if (r1[0] !== 0) {
-        hasGeo = true;
-        geoCC = this.countryAt(r1[0]);
+      const locID = r1 ? r1[0] : 0;
+      if (locID > 0 && locID <= this.geoLocCount) {
+        const idx = locID - 1;
+        const off = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + idx * 4, true);
+        const end = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + (idx + 1) * 4, true);
+        const a = readUvarint(this.bytes, off, end);
+        const b = a && readUvarint(this.bytes, a[1], end);
+        const c = b && readUvarint(this.bytes, b[1], end);
+        if (c) {
+          hasGeo = true;
+          geoCC = this.countryAt(a[0]);
+          geoRegion = this.dictAt(this.regions, b[0]);
+          geoCity = this.dictAt(this.cities, c[0]);
+        }
       }
     }
 
@@ -361,8 +383,8 @@ export class LiteDB {
       },
       location: {
         country_code: geoCC || allocCC,
-        region: null,
-        city: null,
+        region: geoRegion,
+        city: geoCity,
       },
       sources: {
         allocation: hasAlloc,

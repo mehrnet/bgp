@@ -37,14 +37,14 @@ func TestRoundTripAndLookup(t *testing.T) {
 	b.AddAllocation(netip.MustParseAddr("1.0.0.0"), netip.MustParseAddr("1.255.255.255"), "APNIC", "AU")
 	b.AddAllocation(netip.MustParseAddr("1.1.2.0"), netip.MustParseAddr("1.1.2.255"), "APNIC", "SG")
 	b.AddAllocation(netip.MustParseAddr("1.1.2.10"), netip.MustParseAddr("1.1.2.25"), "APNIC", "JP")
-	b.AddGeofeed(netip.MustParseAddr("1.1.1.0"), netip.MustParseAddr("1.1.1.255"), "US")
+	b.AddGeofeed(netip.MustParseAddr("1.1.1.0"), netip.MustParseAddr("1.1.1.255"), "US", "US-CA", "Los Angeles")
 
 	// IPv6 allocation + /64 sub-allocation + geofeed, plus a ::/0 covering placeholder (must not truncate narrower blocks).
 	b.AddAllocation(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "RIPE", "")
 	b.AddAllocation(netip.MustParseAddr("2606:4700::"), netip.MustParseAddr("2606:4700:ffff:ffff:ffff:ffff:ffff:ffff"), "ARIN", "US")
 	b.AddAllocation(netip.MustParseAddr("2606:4700:4700:1::"), netip.MustParseAddr("2606:4700:4700:1:ffff:ffff:ffff:ffff"), "ARIN", "CA")
-	b.AddGeofeed(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "DE")
-	b.AddGeofeed(netip.MustParseAddr("2606:4700:4700::"), netip.MustParseAddr("2606:4700:4700:ffff:ffff:ffff:ffff:ffff"), "GB")
+	b.AddGeofeed(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "DE", "", "")
+	b.AddGeofeed(netip.MustParseAddr("2606:4700:4700::"), netip.MustParseAddr("2606:4700:4700:ffff:ffff:ffff:ffff:ffff"), "GB", "GB-ENG", "London")
 
 	// Overlapping routes (LPM) + multi-origin route + IPv6 route.
 	b.AddRoute(netip.MustParsePrefix("1.1.0.0/16"), 64512)
@@ -80,7 +80,7 @@ func TestRoundTripAndLookup(t *testing.T) {
 	if !r1.Found || !r1.HasAlloc || !r1.HasGeo || !r1.HasRoute {
 		t.Fatalf("r1 flags wrong: %+v", r1)
 	}
-	if r1.Registry != "apnic" || r1.AllocCC != "AU" || r1.GeoCC != "US" {
+	if r1.Registry != "apnic" || r1.AllocCC != "AU" || r1.GeoCC != "US" || r1.GeoRegion != "US-CA" || r1.GeoCity != "Los Angeles" {
 		t.Fatalf("r1 alloc/geo wrong: %+v", r1)
 	}
 	if r1.RoutePrefix.String() != "1.1.1.0/24" || len(r1.RouteASNs) != 1 || r1.RouteASNs[0].Name != "CLOUDFLARENET" {
@@ -108,7 +108,7 @@ func TestRoundTripAndLookup(t *testing.T) {
 	// IPv6 2606:4700:4700::1 -> /48 (AS64512), geo GB, alloc US (arin)
 	r6 := db.LookupIP(netip.MustParseAddr("2606:4700:4700::1"))
 	if !r6.HasRoute || r6.RoutePrefix.String() != "2606:4700:4700::/48" || r6.RouteASNs[0].ASNumber != 64512 ||
-		r6.GeoCC != "GB" || r6.AllocCC != "US" || r6.Registry != "arin" {
+		r6.GeoCC != "GB" || r6.GeoRegion != "GB-ENG" || r6.GeoCity != "London" || r6.AllocCC != "US" || r6.Registry != "arin" {
 		t.Fatalf("r6 wrong: %+v", r6)
 	}
 
