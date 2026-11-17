@@ -38,8 +38,10 @@ func TestRoundTripAndLookup(t *testing.T) {
 	b.AddAllocation(netip.MustParseAddr("1.1.2.0"), netip.MustParseAddr("1.1.2.255"), "APNIC", "SG")
 	b.AddGeofeed(netip.MustParseAddr("1.1.1.0"), netip.MustParseAddr("1.1.1.255"), "US")
 
-	// IPv6 allocation + geofeed.
+	// IPv6 allocation + geofeed, plus a ::/0 covering placeholder (must not truncate narrower blocks).
+	b.AddAllocation(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "RIPE", "")
 	b.AddAllocation(netip.MustParseAddr("2606:4700::"), netip.MustParseAddr("2606:4700:ffff:ffff:ffff:ffff:ffff:ffff"), "ARIN", "US")
+	b.AddGeofeed(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "DE")
 	b.AddGeofeed(netip.MustParseAddr("2606:4700:4700::"), netip.MustParseAddr("2606:4700:4700:ffff:ffff:ffff:ffff:ffff"), "GB")
 
 	// Overlapping routes (LPM) + multi-origin route + IPv6 route.
