@@ -9,4 +9,4 @@ EnvironmentFile=-/etc/bgp-api/update.env
 Nice=19
 IOSchedulingClass=idle
 CPUWeight=1
-ExecStart=/usr/bin/flock -n /run/lock/mehrnet-bgp-api-update.lock /srv/bgp-api/scripts/sync-bbolt.sh
+ExecStart=/usr/bin/flock -n /run/lock/mehrnet-bgp-api-update.lock /srv/bgp-api/scripts/sync-mmap.sh

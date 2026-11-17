@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Download, verify, validate, and activate the latest immutable bbolt release.
+# Download, verify, validate, and activate the latest immutable mmap release.
 # When Caddy is active, updates use a temporary secondary API slot and a
 # graceful proxy reload. Hosts without a proxy (or without enough disk space)
 # use the same-port stop-and-replace fallback.
@@ -7,9 +7,9 @@ set -Eeuo pipefail
 
 readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp-api}"
 readonly DATA_DIR="${BGP_API_DATA_DIR:-/var/lib/bgp-api}"
-readonly PRIMARY_DATABASE_PATH="${BGP_API_PRIMARY_DATABASE_PATH:-${BGP_API_DATABASE_PATH:-$DATA_DIR/primary.bbolt}}"
-readonly SECONDARY_DATABASE_PATH="${BGP_API_SECONDARY_DATABASE_PATH:-$DATA_DIR/secondary.bbolt}"
-readonly LEGACY_DATABASE_PATH="$DATA_DIR/mehrnet_bgp.bbolt"
+readonly PRIMARY_DATABASE_PATH="${BGP_API_PRIMARY_DATABASE_PATH:-${BGP_API_DATABASE_PATH:-$DATA_DIR/primary.mmap}}"
+readonly SECONDARY_DATABASE_PATH="${BGP_API_SECONDARY_DATABASE_PATH:-$DATA_DIR/secondary.mmap}"
+readonly LEGACY_DATABASE_PATH="$DATA_DIR/mehrnet_bgp.mmap"
 readonly BINARY_PATH="${BGP_API_BINARY_PATH:-/usr/local/bin/bgp-api}"
 readonly RELEASE_FILE="${BGP_API_RELEASE_FILE:-$DATA_DIR/release-tag}"
 readonly PUBLISHED_FILE="${BGP_API_PUBLISHED_FILE:-$DATA_DIR/release-published-at}"
@@ -449,7 +449,7 @@ if [ -s "$PUBLISHED_FILE" ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
   fi
 fi
 
-database_asset=mehrnet_bgp_bbolt.tar.zst
+database_asset=mehrnet_bgp_mmap.tar.zst
 binary_asset="bgp-api-linux-${arch}.tar.gz"
 download "$(asset_url SHA256SUMS.txt)" "$work_dir/SHA256SUMS.txt"
 download "$(asset_url "$database_asset")" "$work_dir/$database_asset"
@@ -462,9 +462,9 @@ mkdir "$work_dir/database" "$work_dir/binary"
 low_priority zstd --decompress --stdout "$work_dir/$database_asset" | \
   low_priority tar -xf - -C "$work_dir/database"
 low_priority tar -xzf "$work_dir/$binary_asset" -C "$work_dir/binary"
-new_database="$work_dir/database/mehrnet_bgp.bbolt"
+new_database="$work_dir/database/mehrnet_bgp.mmap"
 new_binary="$work_dir/binary/bgp-api-linux-${arch}"
-[ -s "$new_database" ] || die "database archive did not contain mehrnet_bgp.bbolt"
+[ -s "$new_database" ] || die "database archive did not contain mehrnet_bgp.mmap"
 [ -s "$new_binary" ] || die "binary archive did not contain bgp-api-linux-${arch}"
 chmod 0755 "$new_binary"
 
@@ -529,7 +529,7 @@ if [ "$blue_green" = true ]; then
   chown bgpapi:bgpapi "$target_database"
   chmod 0440 "$target_database"
   # A compatible old slot can shed optional heap caches when memory is tight.
-  # The current bbolt mmap stays valid, so it continues serving correct
+  # The current mmap file stays valid, so it continues serving correct
   # responses until Caddy moves traffic to the staged slot.
   release_active_caches_before_stage "$active_service" "$(port_for_slot "$active_slot")"
   # The old slot keeps serving while the replacement completes its expensive
@@ -639,7 +639,8 @@ else
   stop_service "$SECONDARY_SERVICE"
   wait_stopped "$SERVICE" || die "$SERVICE did not stop"
   wait_stopped "$SECONDARY_SERVICE" || die "$SECONDARY_SERVICE did not stop"
-  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH" "$LEGACY_DATABASE_PATH"
+  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH" "$LEGACY_DATABASE_PATH" \
+    "$DATA_DIR/primary.bbolt" "$DATA_DIR/secondary.bbolt" "$DATA_DIR/mehrnet_bgp.bbolt"
   mv "$new_database" "$PRIMARY_DATABASE_PATH"
   chown bgpapi:bgpapi "$PRIMARY_DATABASE_PATH"
   chmod 0440 "$PRIMARY_DATABASE_PATH"

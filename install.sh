@@ -15,7 +15,8 @@ readonly UPDATE_ENV_FILE="$CONFIG_DIR/update.env"
 readonly SERVICE_FILE="/etc/systemd/system/bgp-api.service"
 readonly SECONDARY_SERVICE_FILE="/etc/systemd/system/bgp-api-secondary.service"
 readonly SYNC_SERVICE_FILE="/etc/systemd/system/bgp-api-sync.service"
-readonly SYNC_SCRIPT="$INSTALL_DIR/scripts/sync-bbolt.sh"
+readonly SYNC_SCRIPT="$INSTALL_DIR/scripts/sync-mmap.sh"
+readonly LEGACY_SYNC_SCRIPT="$INSTALL_DIR/scripts/sync-bbolt.sh"
 readonly INSTALLED_SCRIPT="$INSTALL_DIR/install.sh"
 readonly CRON_FILE="/etc/cron.d/mehrnet-bgp-api-update"
 readonly CADDY_CONFIG="/etc/caddy/conf.d/mehrnet-bgp-api.caddy"
@@ -294,7 +295,7 @@ if [ "$ACTION" = uninstall ]; then
 fi
 
 if [ "$ACTION" = update ]; then
-  [ -x "$SYNC_SCRIPT" ] || die "no bbolt installation found at $INSTALL_DIR"
+  [ -x "$SYNC_SCRIPT" ] || die "no mmap installation found at $INSTALL_DIR"
   if [ -f "$UPDATE_ENV_FILE" ]; then
     set -a
     # shellcheck disable=SC1090
@@ -310,7 +311,7 @@ case "$(uname -m)" in
   *) die "unsupported CPU architecture: $(uname -m)" ;;
 esac
 
-step "Preparing the native bbolt service"
+step "Preparing the native mmap service"
 if ! id -u bgpapi >/dev/null 2>&1; then
   useradd --system --home-dir "$DATA_DIR" --create-home --shell /usr/sbin/nologin bgpapi
 fi
@@ -323,24 +324,24 @@ work_dir="$(mktemp -d)"
 trap 'rm -rf -- "$work_dir"' EXIT
 raw="https://raw.githubusercontent.com/$REPOSITORY/$source_sha"
 download "$raw/install.sh" "$work_dir/install.sh"
-download "$raw/scripts/sync-bbolt.sh" "$work_dir/sync-bbolt.sh"
+download "$raw/scripts/sync-mmap.sh" "$work_dir/sync-mmap.sh"
 download "$raw/deploy/bgp-api.service" "$work_dir/bgp-api.service"
 download "$raw/deploy/bgp-api-secondary.service" "$work_dir/bgp-api-secondary.service"
 download "$raw/deploy/bgp-api-sync.service" "$work_dir/bgp-api-sync.service"
 download "$raw/deploy/Caddyfile" "$work_dir/Caddyfile"
 download "$raw/deploy/caddy.service.d.env.conf" "$work_dir/caddy.service.d.env.conf"
 install -m 0755 "$work_dir/install.sh" "$INSTALLED_SCRIPT"
-install -m 0755 "$work_dir/sync-bbolt.sh" "$SYNC_SCRIPT"
+install -m 0755 "$work_dir/sync-mmap.sh" "$SYNC_SCRIPT"
+rm -f -- "$LEGACY_SYNC_SCRIPT"
 install -m 0644 "$work_dir/bgp-api.service" "$SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-secondary.service" "$SECONDARY_SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-sync.service" "$SYNC_SERVICE_FILE"
 
-# Older installations kept the active file at the legacy path. Move it into
-# the primary slot before starting the two-slot service layout. Stop both
-# services only after all deployment files have been downloaded successfully.
+# Stop both services before migrating from legacy paths or switching slot layout.
 systemctl stop bgp-api.service bgp-api-secondary.service >/dev/null 2>&1 || true
-if [ -e "$DATA_DIR/mehrnet_bgp.bbolt" ] && [ ! -e "$DATA_DIR/primary.bbolt" ]; then
-  mv "$DATA_DIR/mehrnet_bgp.bbolt" "$DATA_DIR/primary.bbolt"
+rm -f -- "$DATA_DIR/mehrnet_bgp.bbolt" "$DATA_DIR/primary.bbolt" "$DATA_DIR/secondary.bbolt"
+if [ -e "$DATA_DIR/mehrnet_bgp.mmap" ] && [ ! -e "$DATA_DIR/primary.mmap" ]; then
+  mv "$DATA_DIR/mehrnet_bgp.mmap" "$DATA_DIR/primary.mmap"
 fi
 
 origin_token=""
@@ -364,8 +365,8 @@ elif [ -n "$memory_kib" ] && [ "$memory_kib" -ge 1800000 ]; then
   go_memory_limit=1024MiB
 fi
 cat > "$ENV_FILE" <<EOF
-BGP_API_DATABASE_PATH=$DATA_DIR/primary.bbolt
-BGP_API_PRIMARY_DATABASE_PATH=$DATA_DIR/primary.bbolt
+BGP_API_DATABASE_PATH=$DATA_DIR/primary.mmap
+BGP_API_PRIMARY_DATABASE_PATH=$DATA_DIR/primary.mmap
 LISTEN_ADDR=127.0.0.1:3102
 GOMAXPROCS=2
 GOMEMLIMIT=$go_memory_limit
@@ -379,8 +380,8 @@ EOF
 chown root:bgpapi "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 cat > "$SECONDARY_ENV_FILE" <<EOF
-BGP_API_DATABASE_PATH=$DATA_DIR/secondary.bbolt
-BGP_API_SECONDARY_DATABASE_PATH=$DATA_DIR/secondary.bbolt
+BGP_API_DATABASE_PATH=$DATA_DIR/secondary.mmap
+BGP_API_SECONDARY_DATABASE_PATH=$DATA_DIR/secondary.mmap
 LISTEN_ADDR=127.0.0.1:3103
 GOMAXPROCS=2
 GOMEMLIMIT=$go_memory_limit
@@ -416,8 +417,8 @@ systemctl daemon-reload
 systemctl enable bgp-api.service >/dev/null
 step "Downloading and activating the latest verified release"
 ORIGIN_AUTH_TOKEN="$origin_token" \
-  BGP_API_DATABASE_PATH="$DATA_DIR/primary.bbolt" \
-  BGP_API_PRIMARY_DATABASE_PATH="$DATA_DIR/primary.bbolt" \
+  BGP_API_DATABASE_PATH="$DATA_DIR/primary.mmap" \
+  BGP_API_PRIMARY_DATABASE_PATH="$DATA_DIR/primary.mmap" \
   BGP_API_BLUE_GREEN=0 "$SYNC_SCRIPT"
 if ! systemctl is-active --quiet bgp-api.service; then
   systemctl restart bgp-api.service

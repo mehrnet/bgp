@@ -1,6 +1,6 @@
 # MehrNet BGP API
 
-Read-only IP intelligence backed by a pre-indexed [bbolt](https://github.com/etcd-io/bbolt) dataset.
+Read-only IP intelligence backed by an immutable, zero-copy memory-mapped (`MNMF`) dataset.
 It combines RIR allocations, BGP routes, ASN records, and geofeed locations in one API.
 
 - Full API: [`bgp-api.mehrnet.com`](https://bgp-api.mehrnet.com)
@@ -16,8 +16,8 @@ RIR, RDAP, routing, or geolocation services while handling a request.
 
 | Capability | Full API (`https://bgp-api.mehrnet.com`) | Lite API (`https://bgp-lite.mehrnet.com`) |
 | :--- | :--- | :--- |
-| Runtime | Bare-metal Go + `bbolt` (~3.4 GiB) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~37 MiB) |
-| `GET /v1/health` | Yes (`database: "bbolt"`) | Yes (`mode: "lite"`, `database: "lite"`) |
+| Runtime | Bare-metal Go + zero-copy `mmap` (`MNMF`) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~38 MiB) |
+| `GET /v1/health` | Yes (`database: "mmap"`) | Yes (`mode: "lite"`, `database: "lite"`) |
 | `GET /v1/ip?query=:ip` | Full IP, route, allocation, geofeed (`country_code`, `region`, `city`), WHOIS (`netname`, `abuse_contact`, dates) | IP, route (`cidr`, `asns`, `origins`), allocation (`registry`, `country_code`, `/32` v4 & `/64` v6), geofeed (`country_code`, `region`, `city`); omits WHOIS prose & `details=full` |
 | `GET /v1/country?query=:ip` | — | Yes (plain text or `?format=json`) |
 | `GET /v1/asn?query=:asn` | Full `aut-num` + paginated route objects with IRR metadata | `aut-num` (`name`, `organization`, `registry`, `country_code`, `status`, `source`, `maintainers`, `abuse_contact`, `description`) + paginated route prefixes |
@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp-api/main/install.sh | \
   sudo bash -s -- --domain bgp-api.example.com --auto-update
 ```
 
-The installer downloads the matching static API binary and bbolt dataset from the
+The installer downloads the matching static API binary and `mmap` dataset from the
 latest GitHub release. It verifies both with `SHA256SUMS.txt` before starting the service.
 
 A public installation stores its hostname in a root-only reinstallation record. After
@@ -103,8 +103,8 @@ the updater falls back to stop-and-replace mode.
 Before staging, the updater records `MemAvailable` and the active process RSS. If
 available memory is below its reserve, it first verifies the active slot's authenticated
 health capability and then sends a compatible process `SIGUSR2`:
-it drops only its optional selector and serialized-response caches, while continuing
-to answer from bbolt. This creates room for the staged process without a traffic
+it drops only its optional serialized-response caches, while continuing
+to answer directly from the `mmap` file. This creates room for the staged process without a traffic
 cutover. The replacement then completes its selected cache warmup before it accepts
 traffic, while the old process continues to answer. Only after that health check does
 Caddy move to the new slot; the prior slot remains a retry target through the drain
@@ -216,9 +216,9 @@ The installer writes `/etc/bgp-api/bgp-api.env`:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `BGP_API_DATABASE_PATH` | `/var/lib/bgp-api/primary.bbolt` | Active database path |
-| `BGP_API_PRIMARY_DATABASE_PATH` | `/var/lib/bgp-api/primary.bbolt` | Primary update slot |
-| `BGP_API_SECONDARY_DATABASE_PATH` | `/var/lib/bgp-api/secondary.bbolt` | Secondary update slot |
+| `BGP_API_DATABASE_PATH` | `/var/lib/bgp-api/primary.mmap` | Active database path |
+| `BGP_API_PRIMARY_DATABASE_PATH` | `/var/lib/bgp-api/primary.mmap` | Primary update slot |
+| `BGP_API_SECONDARY_DATABASE_PATH` | `/var/lib/bgp-api/secondary.mmap` | Secondary update slot |
 | `LISTEN_ADDR` | `127.0.0.1:3102` | HTTP listener for this service |
 | `BGP_API_BLUE_GREEN` | `auto` | `auto`, `1`, or `0` |
 | `BGP_API_STARTUP_TIMEOUT_SECONDS` | `300` | Maximum wait for a staged API slot to become healthy |
@@ -235,19 +235,17 @@ The installer writes `/etc/bgp-api/bgp-api.env`:
 | `GOMAXPROCS` | Go default | CPU limit |
 | `GOMEMLIMIT` | Go default | Soft Go heap limit |
 
-`auto` selects the safest profile from the deployed bbolt file size and `MemTotal`:
+`auto` selects the safest profile from the deployed `mmap` file size and `MemTotal`:
 
 | Profile | Runtime behavior |
 | --- | --- |
 | `minimal` | `64 MiB` compact cache, `16 MiB` resource cache, no dataset preload |
-| `balanced` | `256 MiB` compact cache, `64 MiB` resource cache, and the roughly `508 MiB` compact selector copy |
-| `full` | `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable bbolt file through the Linux page cache |
+| `balanced` | `256 MiB` compact cache, `64 MiB` resource cache, warming the LPM selector slices in the kernel page cache (zero Go heap copy) |
+| `full` | `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable `mmap` file through the Linux page cache |
 
 `full` is not a second Go copy of the database. It needs the dataset, response-cache
-budget, and a `768 MiB` operating-system reserve to fit at once. With the current
-roughly `3.6 GiB` dataset, a 4 GiB host does **not** qualify; `auto` selects `balanced`
-there. A 5 GiB-or-larger host can usually use `full`, while bbolt still lets Linux reclaim
-pages under pressure.
+budget, and a `768 MiB` operating-system reserve to fit at once, while the kernel
+can reclaim mapped pages under pressure.
 
 On ordinary startup the active server begins serving before its selected cache warms. During a
 blue-green update, however, the staged slot warms before its listener opens, while the current
@@ -261,13 +259,13 @@ parsers run in a matrix; release formats and static binaries are built independe
 
 | Asset | Purpose |
 | --- | --- |
-| `mehrnet_bgp_bbolt.tar.zst` | Ready-to-query production dataset |
+| `mehrnet_bgp_mmap.tar.zst` | Ready-to-query production dataset |
 | `mehrnet_bgp_sqlite.tar.zst` | Optional SQLite export for third-party users |
 | `bgp-api-linux-amd64.tar.gz` | Static Linux `amd64` binary |
 | `bgp-api-linux-arm64.tar.gz` | Static Linux `arm64` binary |
 | `SHA256SUMS.txt` | Asset integrity checksums |
 
-The API runtime uses bbolt. SQLite is a separate export and is not required for serving
+The API runtime uses the immutable `mmap` file (`MNMF`). SQLite is a separate export and is not required for serving
 requests.
 
 ## Build from source
@@ -277,7 +275,7 @@ Go 1.22 or newer is required for local builds.
 Run the API against a local dataset:
 
 ```sh
-export BGP_API_DATABASE_PATH="$PWD/mehrnet_bgp.bbolt"
+export BGP_API_DATABASE_PATH="$PWD/mehrnet_bgp.mmap"
 go run ./cmd/bgp-api
 ```
 
@@ -287,12 +285,12 @@ Build a static binary:
 CGO_ENABLED=0 go build -trimpath -o bin/bgp-api ./cmd/bgp-api
 ```
 
-Build a bbolt dataset from producer output:
+Build a `mmap` dataset from producer output:
 
 ```sh
-go run ./cmd/build-bbolt-dataset \
+go run ./cmd/build-mmap-dataset \
   -input final_data \
-  -output mehrnet_bgp.bbolt \
+  -output mehrnet_bgp.mmap \
   -release-tag local \
   -built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -source-commit "$(git rev-parse HEAD)"

@@ -37,11 +37,11 @@ type resourceFakeRepository struct{ fakeRepository }
 type broadQueryFakeRepository struct{ resourceFakeRepository }
 
 func (broadQueryFakeRepository) LookupPrefix(context.Context, ipkey.ParsedPrefix, Page) (*PrefixResponse, error) {
-	return nil, errBboltQueryTooBroad
+	return nil, errQueryTooBroad
 }
 
 func (broadQueryFakeRepository) LookupRange(context.Context, ipkey.ParsedRange, RangeKind, RangePage) (*RangeResponse, error) {
-	return nil, errBboltQueryTooBroad
+	return nil, errQueryTooBroad
 }
 
 func (resourceFakeRepository) LookupPrefix(_ context.Context, prefix ipkey.ParsedPrefix, _ Page) (*PrefixResponse, error) {
