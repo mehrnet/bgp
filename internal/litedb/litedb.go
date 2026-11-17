@@ -469,12 +469,20 @@ func flatten(ivs []interval, bits int, canMerge func(prevStart, currStart uint64
 		}
 		top := active[0]
 		emit(p, top.val, top.aux)
-		if (limit == 0 && top.end == ^uint64(0)) || (limit != 0 && top.end+1 >= limit) {
-			break
-		}
-		next := top.end + 1
-		if i < n && ivs[i].start < next {
+		var next uint64
+		if top.end == ^uint64(0) {
+			if i >= n {
+				break
+			}
 			next = ivs[i].start
+		} else {
+			next = top.end + 1
+			if i < n && ivs[i].start < next {
+				next = ivs[i].start
+			}
+		}
+		if limit != 0 && next >= limit {
+			break
 		}
 		p = next
 	}
