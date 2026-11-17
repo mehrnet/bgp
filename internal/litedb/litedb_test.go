@@ -33,14 +33,16 @@ func TestRoundTripAndLookup(t *testing.T) {
 		Organization: "ORG-PRIV",
 	})
 
-	// Covering allocation + narrower sub-allocation + geofeed override.
+	// Covering allocation + narrower sub-allocation + non-CIDR sub-/24 + geofeed override.
 	b.AddAllocation(netip.MustParseAddr("1.0.0.0"), netip.MustParseAddr("1.255.255.255"), "APNIC", "AU")
 	b.AddAllocation(netip.MustParseAddr("1.1.2.0"), netip.MustParseAddr("1.1.2.255"), "APNIC", "SG")
+	b.AddAllocation(netip.MustParseAddr("1.1.2.10"), netip.MustParseAddr("1.1.2.25"), "APNIC", "JP")
 	b.AddGeofeed(netip.MustParseAddr("1.1.1.0"), netip.MustParseAddr("1.1.1.255"), "US")
 
-	// IPv6 allocation + geofeed, plus a ::/0 covering placeholder (must not truncate narrower blocks).
+	// IPv6 allocation + /64 sub-allocation + geofeed, plus a ::/0 covering placeholder (must not truncate narrower blocks).
 	b.AddAllocation(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "RIPE", "")
 	b.AddAllocation(netip.MustParseAddr("2606:4700::"), netip.MustParseAddr("2606:4700:ffff:ffff:ffff:ffff:ffff:ffff"), "ARIN", "US")
+	b.AddAllocation(netip.MustParseAddr("2606:4700:4700:1::"), netip.MustParseAddr("2606:4700:4700:1:ffff:ffff:ffff:ffff"), "ARIN", "CA")
 	b.AddGeofeed(netip.MustParseAddr("::"), netip.MustParseAddr("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "DE")
 	b.AddGeofeed(netip.MustParseAddr("2606:4700:4700::"), netip.MustParseAddr("2606:4700:4700:ffff:ffff:ffff:ffff:ffff"), "GB")
 
@@ -98,11 +100,21 @@ func TestRoundTripAndLookup(t *testing.T) {
 		t.Fatalf("r3 wrong: %+v", r3)
 	}
 
+	// 1.1.2.15 -> non-CIDR sub-/24 allocation JP
+	if rSub := db.LookupIP(netip.MustParseAddr("1.1.2.15")); rSub.AllocCC != "JP" || rSub.AllocStart.String() != "1.1.2.10" || rSub.AllocEnd.String() != "1.1.2.25" {
+		t.Fatalf("sub-/24 non-CIDR alloc wrong: %+v", rSub)
+	}
+
 	// IPv6 2606:4700:4700::1 -> /48 (AS64512), geo GB, alloc US (arin)
 	r6 := db.LookupIP(netip.MustParseAddr("2606:4700:4700::1"))
 	if !r6.HasRoute || r6.RoutePrefix.String() != "2606:4700:4700::/48" || r6.RouteASNs[0].ASNumber != 64512 ||
 		r6.GeoCC != "GB" || r6.AllocCC != "US" || r6.Registry != "arin" {
 		t.Fatalf("r6 wrong: %+v", r6)
+	}
+
+	// IPv6 /64 sub-allocation
+	if r6Sub := db.LookupIP(netip.MustParseAddr("2606:4700:4700:1::42")); r6Sub.AllocCC != "CA" {
+		t.Fatalf("v6 /64 sub-alloc wrong: %+v", r6Sub)
 	}
 
 	// Sibling /24 lookup must reconstruct 2.0.1.0/24, not 2.0.0.0/24.

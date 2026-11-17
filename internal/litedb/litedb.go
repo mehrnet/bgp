@@ -32,8 +32,8 @@ const (
 	formatVersion = 1
 
 	DefaultBlockSize   = 64
-	DefaultAllocV4Bits = 24
-	DefaultAllocV6Bits = 48
+	DefaultAllocV4Bits = 32
+	DefaultAllocV6Bits = 64
 	DefaultRouteV4Bits = 32
 	DefaultRouteV6Bits = 64
 
@@ -78,6 +78,8 @@ type Stats struct {
 type BuildOptions struct {
 	Metadata         Metadata
 	IncludeASNRoutes bool
+	AllocV4Bits      int
+	AllocV6Bits      int
 }
 
 type interval struct {
@@ -134,6 +136,12 @@ type routeKeyV6 struct {
 }
 
 func NewBuilder(opts BuildOptions) *Builder {
+	if opts.AllocV4Bits <= 0 {
+		opts.AllocV4Bits = DefaultAllocV4Bits
+	}
+	if opts.AllocV6Bits <= 0 {
+		opts.AllocV6Bits = DefaultAllocV6Bits
+	}
 	return &Builder{
 		opts:           opts,
 		autnums:        make(map[uint32]AutnumInput),
@@ -198,7 +206,7 @@ func (b *Builder) AddAllocation(start, end netip.Addr, registry, country string)
 	if reg == "" && cc == "" {
 		return false
 	}
-	family, lo, hi, ok := slotRange(start, end, DefaultAllocV4Bits, DefaultAllocV6Bits)
+	family, lo, hi, ok := slotRange(start, end, b.opts.AllocV4Bits, b.opts.AllocV6Bits)
 	if !ok {
 		return false
 	}
@@ -223,7 +231,7 @@ func (b *Builder) AddGeofeed(start, end netip.Addr, country string) bool {
 	if cc == "" {
 		return false
 	}
-	family, lo, hi, ok := slotRange(start, end, DefaultAllocV4Bits, DefaultAllocV6Bits)
+	family, lo, hi, ok := slotRange(start, end, b.opts.AllocV4Bits, b.opts.AllocV6Bits)
 	if !ok {
 		return false
 	}
@@ -661,10 +669,10 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 	}
 
 	// Flatten all interval layers.
-	allocSegs4 := flatten(b.allocV4, DefaultAllocV4Bits, nil)
-	allocSegs6 := flatten(b.allocV6, DefaultAllocV6Bits, nil)
-	geoSegs4 := flatten(b.geoV4, DefaultAllocV4Bits, nil)
-	geoSegs6 := flatten(b.geoV6, DefaultAllocV6Bits, nil)
+	allocSegs4 := flatten(b.allocV4, b.opts.AllocV4Bits, nil)
+	allocSegs6 := flatten(b.allocV6, b.opts.AllocV6Bits, nil)
+	geoSegs4 := flatten(b.geoV4, b.opts.AllocV4Bits, nil)
+	geoSegs6 := flatten(b.geoV6, b.opts.AllocV6Bits, nil)
 	routeSegs4 := flatten(routeV4Ivs, DefaultRouteV4Bits, sameCIDRBlock(DefaultRouteV4Bits))
 	routeSegs6 := flatten(routeV6Ivs, DefaultRouteV6Bits, sameCIDRBlock(DefaultRouteV6Bits))
 
@@ -678,7 +686,7 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 	buf.WriteString(magic)
 	buf.Write([]byte{
 		formatVersion, flags, DefaultBlockSize,
-		DefaultAllocV4Bits, DefaultAllocV6Bits,
+		byte(b.opts.AllocV4Bits), byte(b.opts.AllocV6Bits),
 		DefaultRouteV4Bits, DefaultRouteV6Bits,
 	})
 	var u16 [2]byte
@@ -754,15 +762,15 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 		writeUvarint(d, uint64(s.val>>16))
 		writeUvarint(d, uint64(s.val&0xffff))
 	}
-	encodeSegTable(&buf, allocSegs4, DefaultAllocV4Bits, DefaultBlockSize, writeAlloc)
-	encodeSegTable(&buf, allocSegs6, DefaultAllocV6Bits, DefaultBlockSize, writeAlloc)
+	encodeSegTable(&buf, allocSegs4, b.opts.AllocV4Bits, DefaultBlockSize, writeAlloc)
+	encodeSegTable(&buf, allocSegs6, b.opts.AllocV6Bits, DefaultBlockSize, writeAlloc)
 
 	// 6. Geofeed overrides (v4, v6)
 	writeGeo := func(d *bytes.Buffer, s segment) {
 		writeUvarint(d, uint64(s.val))
 	}
-	encodeSegTable(&buf, geoSegs4, DefaultAllocV4Bits, DefaultBlockSize, writeGeo)
-	encodeSegTable(&buf, geoSegs6, DefaultAllocV6Bits, DefaultBlockSize, writeGeo)
+	encodeSegTable(&buf, geoSegs4, b.opts.AllocV4Bits, DefaultBlockSize, writeGeo)
+	encodeSegTable(&buf, geoSegs6, b.opts.AllocV6Bits, DefaultBlockSize, writeGeo)
 
 	// 7. Route LPM tables (v4, v6)
 	writeRoute := func(d *bytes.Buffer, s segment) {
