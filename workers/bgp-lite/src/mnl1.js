@@ -80,7 +80,7 @@ export class LiteDB {
       bytes[1] !== 0x4e || // N
       bytes[2] !== 0x4c || // L
       bytes[3] !== 0x31 || // 1
-      bytes[4] !== 2
+      bytes[4] !== 3
     ) {
       throw new Error("invalid MNL1 header");
     }
@@ -180,6 +180,18 @@ export class LiteDB {
     const r6 = readUvarint(this.bytes, p, end);
     p = r6[1];
     const org = r6[0] > 0 ? decoder.decode(this.bytes.subarray(p, p + r6[0])) : null;
+    p += r6[0];
+    const r7 = readUvarint(this.bytes, p, end);
+    p = r7[1];
+    const maintainers = r7[0] > 0 ? decoder.decode(this.bytes.subarray(p, p + r7[0])) : null;
+    p += r7[0];
+    const r8 = readUvarint(this.bytes, p, end);
+    p = r8[1];
+    const abuseContact = r8[0] > 0 ? decoder.decode(this.bytes.subarray(p, p + r8[0])) : null;
+    p += r8[0];
+    const r9 = readUvarint(this.bytes, p, end);
+    p = r9[1];
+    const description = r9[0] > 0 ? decoder.decode(this.bytes.subarray(p, p + r9[0])) : null;
     return {
       asNumber: asn,
       hasAutnum: true,
@@ -189,6 +201,9 @@ export class LiteDB {
       source: this.dictAt(this.sources, r4[0]),
       name,
       organization: org,
+      maintainers,
+      abuseContact,
+      description,
     };
   }
 
@@ -477,9 +492,9 @@ export class LiteDB {
             created: null,
             last_modified: null,
             source: rec.source,
-            maintainers: null,
-            abuse_contact: null,
-            description: null,
+            maintainers: rec.maintainers,
+            abuse_contact: rec.abuseContact,
+            description: rec.description,
           }
         : null,
       items,

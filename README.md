@@ -3,13 +3,26 @@
 Read-only IP intelligence backed by a pre-indexed [bbolt](https://github.com/etcd-io/bbolt) dataset.
 It combines RIR allocations, BGP routes, ASN records, and geofeed locations in one API.
 
-- Live API: [`bgp-api.mehrnet.com`](https://bgp-api.mehrnet.com)
+- Full API: [`bgp-api.mehrnet.com`](https://bgp-api.mehrnet.com)
+- Serverless Lite API: [`bgp-lite.mehrnet.com`](https://bgp-lite.mehrnet.com)
 - Web interface: [`bgp.mehrnet.com`](https://bgp.mehrnet.com)
 - Response contract: [`docs/data-contract.md`](docs/data-contract.md)
 - OpenAPI: [`openapi.json`](https://bgp.mehrnet.com/openapi.json)
 
 The server only reads the immutable release file. It does not build indexes or call
 RIR, RDAP, routing, or geolocation services while handling a request.
+
+## Public Endpoints
+
+| Capability | Full API (`https://bgp-api.mehrnet.com`) | Lite API (`https://bgp-lite.mehrnet.com`) |
+| :--- | :--- | :--- |
+| Runtime | Bare-metal Go + `bbolt` (~3.4 GiB) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~37 MiB) |
+| `GET /v1/health` | Yes (`database: "bbolt"`) | Yes (`mode: "lite"`, `database: "lite"`) |
+| `GET /v1/ip?query=:ip` | Full IP, route, allocation, geofeed (`country_code`, `region`, `city`), WHOIS (`netname`, `abuse_contact`, dates) | IP, route (`cidr`, `asns`, `origins`), allocation (`registry`, `country_code`, `/32` v4 & `/64` v6), geofeed (`country_code`, `region`, `city`); omits WHOIS prose & `details=full` |
+| `GET /v1/country?query=:ip` | — | Yes (plain text or `?format=json`) |
+| `GET /v1/asn?query=:asn` | Full `aut-num` + paginated route objects with IRR metadata | `aut-num` (`name`, `organization`, `registry`, `country_code`, `status`, `source`, `maintainers`, `abuse_contact`, `description`) + paginated route prefixes |
+| `GET /v1/prefix?prefix=:cidr` | Covering allocation + all overlapping IRR route objects | Covering allocation + winning route objects |
+| `GET /v1/range?start=:ip&end=:ip` | Broad `/0`–`/16` summaries & range overlap scans | Not supported (`404`) |
 
 ## Install
 
