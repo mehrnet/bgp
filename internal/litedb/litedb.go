@@ -6,7 +6,7 @@
 //   - deduplicated dictionaries (countries, registries, autnum statuses/sources)
 //   - all autnum identity records sorted by AS number
 //   - flattened RIR allocation segments (registry + country)
-//   - flattened geofeed country override segments
+//   - flattened geofeed location segments (country + region + city)
 //   - flattened longest-prefix-match (LPM) route segments (prefix_len + ASN set)
 //   - per-ASN deduplicated route prefix lists
 //
@@ -29,7 +29,7 @@ import (
 
 const (
 	magic         = "MNL1"
-	formatVersion = 1
+	formatVersion = 2
 
 	DefaultBlockSize   = 64
 	DefaultAllocV4Bits = 32
@@ -63,6 +63,9 @@ type Stats struct {
 	Bytes         int
 	Countries     int
 	Registries    int
+	Regions       int
+	Cities        int
+	GeoLocations  int
 	Autnums       int
 	AllocV4Segs   int
 	AllocV6Segs   int
@@ -104,6 +107,10 @@ type asnRoute struct {
 	keyLo  uint64
 }
 
+type geoLocKey struct {
+	ccID, regID, cityID uint32
+}
+
 type Builder struct {
 	opts BuildOptions
 
@@ -115,6 +122,12 @@ type Builder struct {
 	registries *freqDict
 	statuses   *freqDict
 	sources    *freqDict
+	regions    *freqDict
+	cities     *freqDict
+
+	geoLocMap  map[geoLocKey]uint32
+	geoLocList []geoLocKey
+	geoLocFreq []int
 
 	allocV4, allocV6 []interval
 	geoV4, geoV6     []interval
@@ -151,6 +164,11 @@ func NewBuilder(opts BuildOptions) *Builder {
 		registries:     newFreqDict(),
 		statuses:       newFreqDict(),
 		sources:        newFreqDict(),
+		regions:        newFreqDict(),
+		cities:         newFreqDict(),
+		geoLocMap:      make(map[geoLocKey]uint32),
+		geoLocList:     []geoLocKey{{}},
+		geoLocFreq:     []int{0},
 		routeOriginsV4: make(map[routeKeyV4][]uint32),
 		routeOriginsV6: make(map[routeKeyV6][]uint32),
 	}
@@ -225,20 +243,35 @@ func (b *Builder) AddAllocation(start, end netip.Addr, registry, country string)
 	return true
 }
 
-// AddGeofeed records a geofeed country override range (inclusive bounds).
-func (b *Builder) AddGeofeed(start, end netip.Addr, country string) bool {
+// AddGeofeed records a geofeed location override range (inclusive bounds).
+func (b *Builder) AddGeofeed(start, end netip.Addr, country, region, city string) bool {
 	cc := normalizeCountry(country)
-	if cc == "" {
+	reg := normalizeTrim(region)
+	cty := normalizeTrim(city)
+	if cc == "" && reg == "" && cty == "" {
 		return false
 	}
 	family, lo, hi, ok := slotRange(start, end, b.opts.AllocV4Bits, b.opts.AllocV6Bits)
 	if !ok {
 		return false
 	}
-	ccID := b.countries.id(cc)
+	k := geoLocKey{
+		ccID:   b.countries.id(cc),
+		regID:  b.regions.id(reg),
+		cityID: b.cities.id(cty),
+	}
+	locID, exists := b.geoLocMap[k]
+	if !exists {
+		locID = uint32(len(b.geoLocList))
+		b.geoLocMap[k] = locID
+		b.geoLocList = append(b.geoLocList, k)
+		b.geoLocFreq = append(b.geoLocFreq, 1)
+	} else {
+		b.geoLocFreq[locID]++
+	}
 	b.seq++
 	width := hi - lo
-	iv := interval{start: lo, end: hi, val: ccID, priority: -int(minUint64(width, 1<<30)), seq: b.seq}
+	iv := interval{start: lo, end: hi, val: locID, priority: -int(minUint64(width, 1<<30)), seq: b.seq}
 	if family == 4 {
 		b.geoV4 = append(b.geoV4, iv)
 	} else {
@@ -588,6 +621,33 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 	registries, registryMap := b.registries.compactOrder()
 	statuses, statusMap := b.statuses.compactOrder()
 	sources, sourceMap := b.sources.compactOrder()
+	regions, regionMap := b.regions.compactOrder()
+	cities, cityMap := b.cities.compactOrder()
+
+	// Sort distinct (country, region, city) geofeed locations by descending frequency.
+	nLoc := len(b.geoLocList) - 1
+	locOrder := make([]uint32, nLoc)
+	for i := 0; i < nLoc; i++ {
+		locOrder[i] = uint32(i + 1)
+	}
+	sort.Slice(locOrder, func(i, j int) bool {
+		a, c := locOrder[i], locOrder[j]
+		if b.geoLocFreq[a] != b.geoLocFreq[c] {
+			return b.geoLocFreq[a] > b.geoLocFreq[c]
+		}
+		return a < c
+	})
+	geoLocRemap := make([]uint32, len(b.geoLocList))
+	compactGeoLocs := make([]geoLocKey, nLoc)
+	for i, oldID := range locOrder {
+		geoLocRemap[oldID] = uint32(i + 1)
+		orig := b.geoLocList[oldID]
+		compactGeoLocs[i] = geoLocKey{
+			ccID:   countryMap[orig.ccID],
+			regID:  regionMap[orig.regID],
+			cityID: cityMap[orig.cityID],
+		}
+	}
 
 	// Remap alloc and geo intervals to compact dictionary IDs.
 	for i := range b.allocV4 {
@@ -601,10 +661,10 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 		b.allocV6[i].val = regID<<16 | ccID
 	}
 	for i := range b.geoV4 {
-		b.geoV4[i].val = countryMap[b.geoV4[i].val]
+		b.geoV4[i].val = geoLocRemap[b.geoV4[i].val]
 	}
 	for i := range b.geoV6 {
-		b.geoV6[i].val = countryMap[b.geoV6[i].val]
+		b.geoV6[i].val = geoLocRemap[b.geoV6[i].val]
 	}
 
 	// Build route intervals & multi-origin ASN sets.
@@ -703,9 +763,28 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 	writeStringDict(&buf, registries)
 	writeStringDict(&buf, statuses)
 	writeStringDict(&buf, sources)
+	writeStringDict(&buf, regions)
+	writeStringDict(&buf, cities)
+
+	var u32 [4]byte
+	binary.LittleEndian.PutUint32(u32[:], uint32(len(compactGeoLocs)))
+	buf.Write(u32[:])
+	var geoLocData bytes.Buffer
+	geoLocOffsets := make([]uint32, len(compactGeoLocs)+1)
+	for i, loc := range compactGeoLocs {
+		geoLocOffsets[i] = uint32(geoLocData.Len())
+		writeUvarint(&geoLocData, uint64(loc.ccID))
+		writeUvarint(&geoLocData, uint64(loc.regID))
+		writeUvarint(&geoLocData, uint64(loc.cityID))
+	}
+	geoLocOffsets[len(compactGeoLocs)] = uint32(geoLocData.Len())
+	for _, off := range geoLocOffsets {
+		binary.LittleEndian.PutUint32(u32[:], off)
+		buf.Write(u32[:])
+	}
+	buf.Write(geoLocData.Bytes())
 
 	// 3. Autnums table
-	var u32 [4]byte
 	binary.LittleEndian.PutUint32(u32[:], asnCount)
 	buf.Write(u32[:])
 	for _, asn := range asns {
@@ -816,6 +895,9 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 		Bytes:         buf.Len(),
 		Countries:     len(countries),
 		Registries:    len(registries),
+		Regions:       len(regions),
+		Cities:        len(cities),
+		GeoLocations:  len(compactGeoLocs),
 		Autnums:       len(b.autnums),
 		AllocV4Segs:   len(allocSegs4),
 		AllocV6Segs:   len(allocSegs6),

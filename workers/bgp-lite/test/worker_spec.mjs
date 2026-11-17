@@ -57,8 +57,8 @@ function buildFixtureDB() {
     fs.writeFileSync(
       path.join(tmp, "geolocations.csv"),
       [
-        `${padV4("1.1.1.0")},${padV4("1.1.1.255")},4,US,,`,
-        `${padV6(v6SubStart)},${padV6(v6SubEnd)},6,GB,,`,
+        `${padV4("1.1.1.0")},${padV4("1.1.1.255")},4,US,US-CA,Los Angeles`,
+        `${padV6(v6SubStart)},${padV6(v6SubEnd)},6,GB,GB-ENG,London`,
       ].join("\n") + "\n"
     );
     fs.writeFileSync(
@@ -133,6 +133,8 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b1.network.origins[0].name, "CLOUDFLARENET");
   assert.equal(b1.allocation.country_code, "AU");
   assert.equal(b1.location.country_code, "US");
+  assert.equal(b1.location.region, "US-CA");
+  assert.equal(b1.location.city, "Los Angeles");
   assert.deepEqual(b1.sources, { allocation: true, route: true, geofeed: true });
 
   // Multi-origin
@@ -163,6 +165,8 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b6.network.cidr, "2606:4700:4700::/48");
   assert.equal(b6.network.asn, "AS64512");
   assert.equal(b6.location.country_code, "GB");
+  assert.equal(b6.location.region, "GB-ENG");
+  assert.equal(b6.location.city, "London");
 
   // IPv4-mapped IPv6
   const rm = await call("/v1/ip?query=::ffff:1.1.1.1");

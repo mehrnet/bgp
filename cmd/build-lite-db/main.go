@@ -144,7 +144,7 @@ func main() {
 		}
 		start, ok1 := addrFromSortKey(row[0], row[2])
 		end, ok2 := addrFromSortKey(row[1], row[2])
-		if ok1 && ok2 && builder.AddGeofeed(start, end, at(row, 3)) {
+		if ok1 && ok2 && builder.AddGeofeed(start, end, at(row, 3), at(row, 4), at(row, 5)) {
 			geoCount++
 		}
 	}); err != nil {
@@ -186,9 +186,9 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("loaded autnums=%d allocations=%d geofeeds=%d routes=%d\n", autnumCount, allocCount, geoCount, routeCount)
-	fmt.Printf("wrote %s: bytes=%d (%.2f MiB) countries=%d registries=%d alloc=(%d,%d) geo=(%d,%d) route=(%d,%d) multi_sets=%d asn_routes=%d\n",
+	fmt.Printf("wrote %s: bytes=%d (%.2f MiB) countries=%d registries=%d regions=%d cities=%d geolocs=%d alloc=(%d,%d) geo=(%d,%d) route=(%d,%d) multi_sets=%d asn_routes=%d\n",
 		*output, stats.Bytes, float64(stats.Bytes)/(1024*1024),
-		stats.Countries, stats.Registries,
+		stats.Countries, stats.Registries, stats.Regions, stats.Cities, stats.GeoLocations,
 		stats.AllocV4Segs, stats.AllocV6Segs,
 		stats.GeoV4Segs, stats.GeoV6Segs,
 		stats.RouteV4Segs, stats.RouteV6Segs,
