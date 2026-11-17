@@ -1,0 +1,8 @@
+{
+  "name": "bgp-lite-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/worker_spec.mjs"
+  }
+}
