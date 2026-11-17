@@ -79,7 +79,16 @@ func main() {
 	builtAt := flag.String("built-at", "", "dataset build timestamp")
 	commit := flag.String("source-commit", "", "producer source commit")
 	includeASNRoutes := flag.Bool("include-asn-routes", true, "include per-ASN deduplicated route prefix lists")
+	allocV4Bits := flag.Int("alloc-v4-prefix", litedb.DefaultAllocV4Bits, "allocation/geofeed IPv4 granularity as a prefix length (1..32)")
+	allocV6Bits := flag.Int("alloc-v6-prefix", litedb.DefaultAllocV6Bits, "allocation/geofeed IPv6 granularity as a prefix length (1..64)")
 	flag.Parse()
+
+	if *allocV4Bits < 1 || *allocV4Bits > 32 {
+		log.Fatalf("invalid -alloc-v4-prefix %d (must be 1..32)", *allocV4Bits)
+	}
+	if *allocV6Bits < 1 || *allocV6Bits > 64 {
+		log.Fatalf("invalid -alloc-v6-prefix %d (must be 1..64)", *allocV6Bits)
+	}
 
 	builder := litedb.NewBuilder(litedb.BuildOptions{
 		Metadata: litedb.Metadata{
@@ -88,6 +97,8 @@ func main() {
 			SourceCommit: *commit,
 		},
 		IncludeASNRoutes: *includeASNRoutes,
+		AllocV4Bits:      *allocV4Bits,
+		AllocV6Bits:      *allocV6Bits,
 	})
 
 	var autnumCount, allocCount, geoCount, routeCount int

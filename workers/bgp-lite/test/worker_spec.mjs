@@ -41,12 +41,17 @@ function buildFixtureDB() {
     const v6SubStart = v6Start | (0x4700n << 80n);
     const v6SubEnd = v6SubStart | ((1n << 80n) - 1n);
 
+    const v6Sub64Start = v6SubStart | (1n << 64n);
+    const v6Sub64End = v6Sub64Start | ((1n << 64n) - 1n);
+
     fs.writeFileSync(
       path.join(tmp, "allocations.csv"),
       [
         `${padV4("1.0.0.0")},${padV4("1.255.255.255")},4,apnic,AU,apnic-net,,,,,,,,,`,
         `${padV4("1.1.2.0")},${padV4("1.1.2.255")},4,apnic,SG,sg-net,,,,,,,,,`,
+        `${padV4("1.1.2.10")},${padV4("1.1.2.25")},4,apnic,JP,jp-sub,,,,,,,,,`,
         `${padV6(v6Start)},${padV6(v6End)},6,arin,US,cf-v6,,,,,,,,,`,
+        `${padV6(v6Sub64Start)},${padV6(v6Sub64End)},6,arin,CA,cf-v6-64,,,,,,,,,`,
       ].join("\n") + "\n"
     );
     fs.writeFileSync(
@@ -136,6 +141,16 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b2.network.asn, null);
   assert.equal(b2.network.as_number, null);
   assert.deepEqual(b2.network.asns, ["AS13335", "AS64512"]);
+
+  // Sub-/24 non-CIDR allocation
+  const rSub = (await call("/v1/ip?query=1.1.2.15")).json();
+  assert.equal(rSub.allocation.country_code, "JP");
+  assert.equal(rSub.allocation.start_ip, "1.1.2.10");
+  assert.equal(rSub.allocation.end_ip, "1.1.2.25");
+
+  // IPv6 /64 sub-allocation
+  const r6Sub = (await call("/v1/ip?query=2606:4700:4700:1::42")).json();
+  assert.equal(r6Sub.allocation.country_code, "CA");
 
   // Sibling /24 must not collapse
   const r3 = await call("/v1/ip?query=2.0.1.42");
