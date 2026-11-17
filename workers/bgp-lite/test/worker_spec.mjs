@@ -32,7 +32,7 @@ function buildFixtureDB() {
     fs.writeFileSync(
       path.join(tmp, "autnums.csv"),
       [
-        "AS13335,arin,US,CLOUDFLARENET,ORG-CLOUD14-ARIN,ASSIGNED,,,,ARIN,,",
+        "AS13335,arin,US,CLOUDFLARENET,ORG-CLOUD14-ARIN,ASSIGNED,,,ARIN,ARIN-HM,abuse@cloudflare.com,Cloudflare Inc.",
         "AS64512,ripe,DE,PRIV-NET,ORG-PRIV,ASSIGNED,,,,RIPE,,",
       ].join("\n") + "\n"
     );
@@ -184,6 +184,9 @@ test("v1/asn and v1/prefix", async () => {
   assert.equal(a1.status, 200);
   const ab = a1.json();
   assert.equal(ab.autnum.name, "CLOUDFLARENET");
+  assert.equal(ab.autnum.maintainers, "ARIN-HM");
+  assert.equal(ab.autnum.abuse_contact, "abuse@cloudflare.com");
+  assert.equal(ab.autnum.description, "Cloudflare Inc.");
   assert.equal(ab.routes.items.length, 2);
   assert.equal(ab.routes.total_items, 5);
   assert.equal(ab.routes.total_pages, 3);

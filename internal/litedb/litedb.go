@@ -29,7 +29,7 @@ import (
 
 const (
 	magic         = "MNL1"
-	formatVersion = 2
+	formatVersion = 3
 
 	DefaultBlockSize   = 64
 	DefaultAllocV4Bits = 32
@@ -47,7 +47,7 @@ type Metadata struct {
 	SourceCommit string `json:"source_commit,omitempty"`
 }
 
-// AutnumInput holds the compact identity fields retained per AS number.
+// AutnumInput holds the identity fields retained per AS number.
 type AutnumInput struct {
 	ASNumber     uint32
 	Registry     string
@@ -56,6 +56,9 @@ type AutnumInput struct {
 	Organization string
 	Status       string
 	Source       string
+	Maintainers  string
+	AbuseContact string
+	Description  string
 }
 
 // Stats summarizes the built MNL1 artifact.
@@ -209,6 +212,9 @@ func (b *Builder) AddAutnum(in AutnumInput) bool {
 	in.Organization = normalizeTrim(in.Organization)
 	in.Status = normalizeTrim(in.Status)
 	in.Source = normalizeTrim(in.Source)
+	in.Maintainers = normalizeTrim(in.Maintainers)
+	in.AbuseContact = normalizeTrim(in.AbuseContact)
+	in.Description = normalizeTrim(in.Description)
 	b.autnums[in.ASNumber] = in
 	b.registries.bump(in.Registry)
 	b.countries.bump(in.Country)
@@ -809,6 +815,12 @@ func (b *Builder) Encode(w io.Writer) (Stats, error) {
 		autnumData.WriteString(rec.Name)
 		writeUvarint(&autnumData, uint64(len(rec.Organization)))
 		autnumData.WriteString(rec.Organization)
+		writeUvarint(&autnumData, uint64(len(rec.Maintainers)))
+		autnumData.WriteString(rec.Maintainers)
+		writeUvarint(&autnumData, uint64(len(rec.AbuseContact)))
+		autnumData.WriteString(rec.AbuseContact)
+		writeUvarint(&autnumData, uint64(len(rec.Description)))
+		autnumData.WriteString(rec.Description)
 	}
 	autnumOffsets[len(asns)] = uint32(autnumData.Len())
 	for _, off := range autnumOffsets {

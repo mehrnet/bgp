@@ -24,6 +24,9 @@ func TestRoundTripAndLookup(t *testing.T) {
 		Organization: "ORG-CLOUD14-ARIN",
 		Status:       "ASSIGNED",
 		Source:       "ARIN",
+		Maintainers:  "ARIN-HM",
+		AbuseContact: "abuse@cloudflare.com",
+		Description:  "Cloudflare, Inc.",
 	})
 	b.AddAutnum(AutnumInput{
 		ASNumber:     64512,
@@ -124,7 +127,9 @@ func TestRoundTripAndLookup(t *testing.T) {
 
 	// LookupASN pagination
 	a1 := db.LookupASN(13335, 1, 2)
-	if !a1.Found || !a1.HasAutnum || a1.Autnum.Name != "CLOUDFLARENET" || a1.TotalRoute != 5 || len(a1.Routes) != 2 {
+	if !a1.Found || !a1.HasAutnum || a1.Autnum.Name != "CLOUDFLARENET" ||
+		a1.Autnum.AbuseContact != "abuse@cloudflare.com" || a1.Autnum.Maintainers != "ARIN-HM" ||
+		a1.Autnum.Description != "Cloudflare, Inc." || a1.TotalRoute != 5 || len(a1.Routes) != 2 {
 		t.Fatalf("LookupASN wrong: %+v", a1)
 	}
 

@@ -64,6 +64,9 @@ type AutnumRecord struct {
 	Organization string
 	Status       string
 	Source       string
+	Maintainers  string
+	AbuseContact string
+	Description  string
 }
 
 type IPResult struct {
@@ -412,6 +415,24 @@ func (db *DB) autnumByIdx(idx int) (AutnumRecord, bool) {
 		return AutnumRecord{ASNumber: asn}, false
 	}
 	org := string(db.data[p : p+int(oLen)])
+	p += int(oLen)
+	mLen, p, ok7 := readUvarintAt(db.data, p, end)
+	if !ok7 || p+int(mLen) > end {
+		return AutnumRecord{ASNumber: asn}, false
+	}
+	maintainers := string(db.data[p : p+int(mLen)])
+	p += int(mLen)
+	aLen, p, ok8 := readUvarintAt(db.data, p, end)
+	if !ok8 || p+int(aLen) > end {
+		return AutnumRecord{ASNumber: asn}, false
+	}
+	abuse := string(db.data[p : p+int(aLen)])
+	p += int(aLen)
+	dLen, p, ok9 := readUvarintAt(db.data, p, end)
+	if !ok9 || p+int(dLen) > end {
+		return AutnumRecord{ASNumber: asn}, false
+	}
+	desc := string(db.data[p : p+int(dLen)])
 	return AutnumRecord{
 		ASNumber:     asn,
 		Registry:     dictAt(db.registries, regID),
@@ -420,6 +441,9 @@ func (db *DB) autnumByIdx(idx int) (AutnumRecord, bool) {
 		Organization: org,
 		Status:       dictAt(db.statuses, stID),
 		Source:       dictAt(db.sources, srcID),
+		Maintainers:  maintainers,
+		AbuseContact: abuse,
+		Description:  desc,
 	}, true
 }
 

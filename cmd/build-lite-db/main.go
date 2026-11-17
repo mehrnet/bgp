@@ -118,6 +118,9 @@ func main() {
 			Organization: at(row, 4),
 			Status:       at(row, 5),
 			Source:       at(row, 8),
+			Maintainers:  at(row, 9),
+			AbuseContact: at(row, 10),
+			Description:  at(row, 11),
 		}) {
 			autnumCount++
 		}
