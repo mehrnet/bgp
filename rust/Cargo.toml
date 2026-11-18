@@ -1,0 +1,45 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mnmf-store",
+    "crates/bgp-api-core",
+    "crates/bgp-api-server",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.88"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+cognitive_complexity = "deny"
+too_many_lines = "deny"
+too_many_arguments = "deny"
+clone_on_ref_ptr = "deny"
+
+[workspace.dependencies]
+base64 = "0.22"
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "http2", "server"] }
+hyper-util = { version = "0.1", features = ["http1", "http2", "server", "tokio"] }
+memmap2 = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "sync", "time", "macros"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

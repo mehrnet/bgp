@@ -1,0 +1,41 @@
+name: Rust Runtime Quality & Parity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/**"
+      - "scripts/verify-rust-parity.sh"
+      - ".github/workflows/rust-ci.yml"
+  pull_request:
+    paths:
+      - "rust/**"
+      - "scripts/verify-rust-parity.sh"
+      - ".github/workflows/rust-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  rust-quality-and-parity:
+    name: Rust lints, tests, static musl build & Go parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+      - name: Run Rust quality gate (line limits, fmt, clippy, unit tests)
+        working-directory: rust
+        run: ./scripts/check-quality.sh
+      - name: Run Go vs Rust differential HTTP parity check
+        run: ./scripts/verify-rust-parity.sh
+      - name: Build static Linux x86_64 musl release binary
+        working-directory: rust
+        run: |
+          cargo build --release --target x86_64-unknown-linux-musl --bin bgp-api
+          file target/x86_64-unknown-linux-musl/release/bgp-api
