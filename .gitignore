@@ -6,3 +6,4 @@ bin/
 mehrnet_bgp.db
 *.test
 *.mnl
+rust/target/

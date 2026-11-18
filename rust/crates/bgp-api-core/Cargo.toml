@@ -1,0 +1,16 @@
+[package]
+name = "bgp-api-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+base64 = { workspace = true }
+bytes = { workspace = true }
+mnmf-store = { path = "../mnmf-store" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }

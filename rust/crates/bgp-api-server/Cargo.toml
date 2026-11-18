@@ -1,0 +1,22 @@
+[package]
+name = "bgp-api-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "bgp-api"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+bgp-api-core = { path = "../bgp-api-core" }
+bytes = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+mnmf-store = { path = "../mnmf-store" }
+serde_json = { workspace = true }
+tokio = { workspace = true }
