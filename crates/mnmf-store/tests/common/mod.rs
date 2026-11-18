@@ -85,6 +85,8 @@ fn fill_default_sections(table: &mut [Vec<u8>; SECTION_COUNT]) {
     set_if_empty(table, Section::AllocLpmV6, empty_selection_lpm(6));
     set_if_empty(table, Section::GeoLpmV4, empty_selection_lpm(4));
     set_if_empty(table, Section::GeoLpmV6, empty_selection_lpm(6));
+    set_if_empty(table, Section::GeoFallbackLpmV4, empty_selection_lpm(4));
+    set_if_empty(table, Section::GeoFallbackLpmV6, empty_selection_lpm(6));
     set_if_empty(table, Section::RouteLpmV4, empty_route_lpm(4));
     set_if_empty(table, Section::RouteLpmV6, empty_route_lpm(6));
 }

@@ -123,6 +123,8 @@ fn geofeed_detail(v: &Geofeed) -> LookupDetailRecord {
         country_raw: c_raw,
         region: opt_trimmed(&v.region),
         city: opt_trimmed(&v.city),
+        latitude: v.latitude,
+        longitude: v.longitude,
         ..LookupDetailRecord::default()
     }
 }

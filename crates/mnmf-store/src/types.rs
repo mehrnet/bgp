@@ -3,11 +3,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use serde::{Deserialize, Serialize};
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 pub const FORMAT_VERSION: u32 = 1;
 pub const HEADER_FIXED_SIZE: usize = 16;
 pub const SECTION_ENTRY_SIZE: usize = 16;
-pub const SECTION_COUNT: usize = 31;
+pub const SECTION_COUNT: usize = 33;
 pub const HEADER_SIZE: usize = HEADER_FIXED_SIZE + SECTION_COUNT * SECTION_ENTRY_SIZE;
 pub const RANGE_KEY_SIZE: usize = 37;
 pub const MAGIC: [u8; 4] = *b"MNMF";
@@ -45,6 +45,8 @@ pub enum Section {
     RouteRangeV6 = 28,
     SummaryIndex = 29,
     SummaryData = 30,
+    GeoFallbackLpmV4 = 31,
+    GeoFallbackLpmV6 = 32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -118,7 +120,7 @@ pub struct Route {
     pub description: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Geofeed {
     pub version: u8,
     pub start: Address,
@@ -126,6 +128,9 @@ pub struct Geofeed {
     pub country: String,
     pub region: String,
     pub city: String,
+    pub latitude: Option<f64>,
+    pub longitude: Option<f64>,
+    pub is_fallback: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

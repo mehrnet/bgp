@@ -16,12 +16,8 @@ fn temp_dir(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!("sqlite-test-{tag}-{nanos}"))
 }
 
-#[test]
-fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = temp_dir("ok");
-    let input = dir.join("final_data");
-    fs::create_dir_all(&input)?;
-
+fn write_sqlite_fixtures(input: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(input)?;
     let (s, e) = (pad_sort_key_str("1.1.1.0"), pad_sort_key_str("1.1.1.255"));
     fs::write(
         input.join("allocations.csv"),
@@ -35,10 +31,23 @@ fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std
         input.join("geolocations.csv"),
         format!("{s},{e},4,AU,QLD,Brisbane\n"),
     )?;
+    let (fs, fe) = (pad_sort_key_str("2.2.2.0"), pad_sort_key_str("2.2.2.255"));
+    fs::write(
+        input.join("geolocations_fallback.csv"),
+        format!("{fs},{fe},4,DE,Berlin,Berlin,52.52,13.405\n"),
+    )?;
     fs::write(
         input.join("autnums.csv"),
         "AS13335,APNIC,US,CLOUDFLARENET,ORG-CLOUD,ASSIGNED,,,APNIC,,abuse@example.test,\n",
     )?;
+    Ok(())
+}
+
+#[test]
+fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std::error::Error>> {
+    let dir = temp_dir("ok");
+    let input = dir.join("final_data");
+    write_sqlite_fixtures(&input)?;
 
     let db_path = dir.join("mehrnet_bgp.db");
     build_sqlite_dataset(
@@ -55,7 +64,15 @@ fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std
 
     let conn = Connection::open(&db_path)?;
     let pfx_rows: i64 = conn.query_row("SELECT count(*) FROM lookup_prefixes", [], |r| r.get(0))?;
-    assert_eq!(pfx_rows, 3);
+    assert_eq!(pfx_rows, 4);
+    let (lat, lon, fb): (Option<f64>, Option<f64>, i64) = conn.query_row(
+        "SELECT latitude, longitude, is_fallback FROM geolocations WHERE city = 'Berlin'",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    assert_eq!(lat, Some(52.52));
+    assert_eq!(lon, Some(13.405));
+    assert_eq!(fb, 1);
     let tag: String =
         conn.query_row("SELECT release_tag FROM bgp_api_dataset", [], |r| r.get(0))?;
     assert_eq!(tag, "db-sql-test");

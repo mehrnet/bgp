@@ -15,7 +15,7 @@ use crate::types::{
     SECTION_ENTRY_SIZE, Section, StoreError, TableKind,
 };
 
-pub(crate) fn selector_sections() -> [Section; 6] {
+pub(crate) fn selector_sections() -> [Section; 8] {
     [
         Section::AllocLpmV4,
         Section::AllocLpmV6,
@@ -23,6 +23,8 @@ pub(crate) fn selector_sections() -> [Section; 6] {
         Section::GeoLpmV6,
         Section::RouteLpmV4,
         Section::RouteLpmV6,
+        Section::GeoFallbackLpmV4,
+        Section::GeoFallbackLpmV6,
     ]
 }
 
@@ -132,6 +134,8 @@ fn validate_lpms<'a>(slice: impl Fn(Section) -> &'a [u8]) -> Result<(), StoreErr
     validate_selection_lpm(slice(Section::AllocLpmV6), 6)?;
     validate_selection_lpm(slice(Section::GeoLpmV4), 4)?;
     validate_selection_lpm(slice(Section::GeoLpmV6), 6)?;
+    validate_selection_lpm(slice(Section::GeoFallbackLpmV4), 4)?;
+    validate_selection_lpm(slice(Section::GeoFallbackLpmV6), 6)?;
     validate_route_lpm(slice(Section::RouteLpmV4), 4)?;
     validate_route_lpm(slice(Section::RouteLpmV6), 6)
 }

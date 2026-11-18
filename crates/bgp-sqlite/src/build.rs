@@ -2,7 +2,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use rusqlite::{Connection, ToSql, params};
+use rusqlite::types::Value;
+use rusqlite::{Connection, params};
 
 const BATCH_SIZE: usize = 10_000;
 
@@ -57,13 +58,14 @@ const SPECS: &[TableSpec<'static>] = &[
     TableSpec {
         name: "geolocations",
         file: "geolocations.csv",
-        fields: 6,
+        fields: 8,
         required: &[0, 1, 2],
         report_every: 500_000,
         create_sql: "CREATE TABLE geolocations (
             start_ip_sort TEXT NOT NULL, end_ip_sort TEXT NOT NULL, ip_version INTEGER NOT NULL,
-            country TEXT, region TEXT, city TEXT);",
-        insert_sql: "INSERT INTO geolocations (start_ip_sort, end_ip_sort, ip_version, country, region, city) VALUES (?1,?2,?3,?4,?5,?6)",
+            country TEXT, region TEXT, city TEXT,
+            latitude REAL, longitude REAL, is_fallback INTEGER NOT NULL DEFAULT 0);",
+        insert_sql: "INSERT INTO geolocations (start_ip_sort, end_ip_sort, ip_version, country, region, city, latitude, longitude, is_fallback) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
     },
 ];
 
@@ -91,7 +93,19 @@ pub fn build_sqlite_dataset(
     for spec in SPECS {
         conn.execute_batch(spec.create_sql)
             .map_err(|e| format!("create {}: {e}", spec.name))?;
-        let count = import_csv(&mut conn, &input_dir.join(spec.file), spec)?;
+        let is_geo = spec.name == "geolocations";
+        let mut count = import_csv(
+            &mut conn,
+            &input_dir.join(spec.file),
+            spec,
+            is_geo.then_some(0),
+        )?;
+        if is_geo {
+            let fb = input_dir.join("geolocations_fallback.csv");
+            if fb.is_file() {
+                count += import_csv(&mut conn, &fb, spec, Some(1))?;
+            }
+        }
         println!("{}: {} rows", spec.name, count);
     }
     conn.execute_batch("ANALYZE; PRAGMA optimize;")
@@ -126,14 +140,19 @@ fn create_metadata(conn: &Connection, tag: &str, built: &str, commit: &str) -> R
     Ok(())
 }
 
-fn import_csv(conn: &mut Connection, path: &Path, spec: &TableSpec<'_>) -> Result<usize, String> {
+fn import_csv(
+    conn: &mut Connection,
+    path: &Path,
+    spec: &TableSpec<'_>,
+    geo_fallback: Option<i64>,
+) -> Result<usize, String> {
     let file = File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     let mut rdr = csv::ReaderBuilder::new()
         .has_headers(false)
         .flexible(true)
         .from_reader(BufReader::with_capacity(1 << 20, file));
     let mut rec = csv::ByteRecord::new();
-    let mut batch: Vec<Vec<Option<String>>> = Vec::with_capacity(BATCH_SIZE);
+    let mut batch: Vec<Vec<Value>> = Vec::with_capacity(BATCH_SIZE);
     let mut count = 0usize;
     while rdr
         .read_byte_record(&mut rec)
@@ -142,7 +161,7 @@ fn import_csv(conn: &mut Connection, path: &Path, spec: &TableSpec<'_>) -> Resul
         if !valid_row(&rec, spec.required) {
             continue;
         }
-        batch.push(row_values(&rec, spec.fields));
+        batch.push(row_values(&rec, spec.fields, geo_fallback));
         count += 1;
         if batch.len() >= BATCH_SIZE {
             flush_batch(conn, spec.insert_sql, &mut batch)?;
@@ -163,14 +182,13 @@ fn import_csv(conn: &mut Connection, path: &Path, spec: &TableSpec<'_>) -> Resul
 fn flush_batch(
     conn: &mut Connection,
     sql: &str,
-    batch: &mut Vec<Vec<Option<String>>>,
+    batch: &mut Vec<Vec<Value>>,
 ) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| format!("begin tx: {e}"))?;
     {
         let mut stmt = tx.prepare(sql).map_err(|e| format!("prepare: {e}"))?;
         for row in batch.iter() {
-            let params: Vec<&dyn ToSql> = row.iter().map(|v| v as &dyn ToSql).collect();
-            stmt.execute(params.as_slice())
+            stmt.execute(rusqlite::params_from_iter(row.iter()))
                 .map_err(|e| format!("insert: {e}"))?;
         }
     }
@@ -186,12 +204,27 @@ fn valid_row(rec: &csv::ByteRecord, required: &[usize]) -> bool {
     })
 }
 
-fn row_values(rec: &csv::ByteRecord, fields: usize) -> Vec<Option<String>> {
-    (0..fields)
+fn row_values(rec: &csv::ByteRecord, fields: usize, geo_fallback: Option<i64>) -> Vec<Value> {
+    let mut vals: Vec<Value> = (0..fields)
         .map(|i| {
-            let b = rec.get(i)?;
+            let Some(b) = rec.get(i) else {
+                return Value::Null;
+            };
             let s = String::from_utf8_lossy(b).trim().to_owned();
-            (!s.is_empty()).then_some(s)
+            if s.is_empty() {
+                Value::Null
+            } else if geo_fallback.is_some() && (i == 6 || i == 7) {
+                s.parse::<f64>()
+                    .ok()
+                    .filter(|v| v.is_finite())
+                    .map_or(Value::Null, Value::Real)
+            } else {
+                Value::Text(s)
+            }
         })
-        .collect()
+        .collect();
+    if let Some(fb) = geo_fallback {
+        vals.push(Value::Integer(fb));
+    }
+    vals
 }

@@ -151,6 +151,14 @@ impl<'a> Reader<'a> {
         }
     }
 
+    pub(crate) fn f64_be(&mut self) -> Result<f64, StoreError> {
+        let bytes: [u8; 8] = self
+            .take(8)?
+            .try_into()
+            .map_err(|_| StoreError::InvalidFormat("truncated f64".into()))?;
+        Ok(f64::from_be_bytes(bytes))
+    }
+
     pub(crate) fn done(&self) -> Result<(), StoreError> {
         if self.pos == self.buf.len() {
             Ok(())

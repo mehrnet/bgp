@@ -28,14 +28,6 @@ impl TableSections {
         pfx4: Section::AllocPrefixV4,
         pfx6: Section::AllocPrefixV6,
     };
-    pub(crate) const GEO: Self = Self {
-        lpm4: Section::GeoLpmV4,
-        lpm6: Section::GeoLpmV6,
-        range4: None,
-        range6: None,
-        pfx4: Section::GeofeedPrefixV4,
-        pfx6: Section::GeofeedPrefixV6,
-    };
 }
 
 #[derive(Default)]
@@ -73,6 +65,24 @@ impl RangePrefixPair {
         }
         covers.len() as u64
     }
+}
+
+pub(crate) fn write_geo_indexes(
+    w: &mut MmapWriter,
+    rfc_idx: &mut RangePrefixPair,
+    fb_idx: &mut RangePrefixPair,
+    stats: &mut BuildStats,
+) -> Result<(), String> {
+    write_sel_lpm(w, 4, Section::GeoLpmV4, &rfc_idx.r4, stats, false)?;
+    write_sel_lpm(w, 6, Section::GeoLpmV6, &rfc_idx.r6, stats, false)?;
+    write_sel_lpm(w, 4, Section::GeoFallbackLpmV4, &fb_idx.r4, stats, false)?;
+    write_sel_lpm(w, 6, Section::GeoFallbackLpmV6, &fb_idx.r6, stats, false)?;
+    rfc_idx.p4.extend_from_slice(&fb_idx.p4);
+    rfc_idx.p6.extend_from_slice(&fb_idx.p6);
+    sort_fixed_records(&mut rfc_idx.p4, PREFIX_V4_STRIDE);
+    w.write_section(Section::GeofeedPrefixV4, &rfc_idx.p4)?;
+    sort_fixed_records(&mut rfc_idx.p6, PREFIX_V6_STRIDE);
+    w.write_section(Section::GeofeedPrefixV6, &rfc_idx.p6)
 }
 
 pub(crate) fn write_sel_and_indexes(
