@@ -1,17 +1,27 @@
 import { parseIP, parsePrefix } from "./ip.js";
 
 const DEFAULT_ALLOWED_ORIGINS = ["https://bgp.mehrnet.com"];
+const DEFAULT_ORIGINS_SET = new Set(DEFAULT_ALLOWED_ORIGINS);
+const DATA_CACHE_CONTROL = "public, max-age=3600, s-maxage=86400";
+let cachedOriginsRaw;
+let cachedOriginsSet = DEFAULT_ORIGINS_SET;
 
 function parseAllowedOrigins(env) {
-  if (env && env.CORS_ALLOWED_ORIGINS_JSON) {
-    try {
-      const list = JSON.parse(env.CORS_ALLOWED_ORIGINS_JSON);
-      if (Array.isArray(list)) return new Set(list.map((s) => String(s).trim()).filter(Boolean));
-    } catch {
-      // fall back to default
+  const raw = env && env.CORS_ALLOWED_ORIGINS_JSON;
+  if (!raw) return DEFAULT_ORIGINS_SET;
+  if (raw === cachedOriginsRaw) return cachedOriginsSet;
+  let set = DEFAULT_ORIGINS_SET;
+  try {
+    const list = JSON.parse(raw);
+    if (Array.isArray(list)) {
+      set = new Set(list.map((s) => String(s).trim()).filter(Boolean));
     }
+  } catch {
+    // fall back to default
   }
-  return new Set(DEFAULT_ALLOWED_ORIGINS);
+  cachedOriginsRaw = raw;
+  cachedOriginsSet = set;
+  return set;
 }
 
 function corsHeaders(request, env) {
@@ -36,6 +46,20 @@ function jsonResponse(status, body, extraHeaders) {
       ...extraHeaders,
     },
   });
+}
+
+function withCorsHeaders(response, cors) {
+  const out = new Response(response.body, response);
+  for (const [k, v] of Object.entries(cors)) {
+    out.headers.set(k, v);
+  }
+  return out;
+}
+
+function buildEdgeCacheKey(url, db) {
+  const cacheUrl = new URL(url.origin + url.pathname + url.search);
+  cacheUrl.searchParams.set("__v", db.meta.release_tag || "0");
+  return new Request(cacheUrl.toString(), { method: "GET" });
 }
 
 function errorResponse(status, code, message, extraHeaders) {
@@ -102,7 +126,7 @@ function parseASN(raw) {
   return n;
 }
 
-export async function handleRequest(db, request, env = {}) {
+export async function handleRequest(db, request, env = {}, ctx = null) {
   const headers = corsHeaders(request, env);
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -117,9 +141,10 @@ export async function handleRequest(db, request, env = {}) {
   const url = new URL(request.url);
   const path = url.pathname;
   const meta = datasetMeta(db);
+  const noStoreHeaders = { ...headers, "Cache-Control": "no-store" };
 
   if (path === "/") {
-    return jsonResponse(200, { ok: true, service: "bgp-api", mode: "lite", version: 1 }, headers);
+    return jsonResponse(200, { ok: true, service: "bgp-api", mode: "lite", version: 1 }, noStoreHeaders);
   }
 
   if (path === "/v1/health") {
@@ -138,9 +163,45 @@ export async function handleRequest(db, request, env = {}) {
         },
         dataset: meta,
       },
-      headers
+      noStoreHeaders
     );
   }
+
+  const isCallerCountry = path === "/v1/country" && !url.searchParams.get("query");
+  const edgeCache =
+    !isCallerCountry && typeof caches !== "undefined" && caches && caches.default ? caches.default : null;
+  const cacheKey = edgeCache ? buildEdgeCacheKey(url, db) : null;
+  if (edgeCache && cacheKey) {
+    const hit = await edgeCache.match(cacheKey);
+    if (hit) {
+      return withCorsHeaders(hit, headers);
+    }
+  }
+
+  const res = await handleDataRoute(db, url, path, meta, request, headers, isCallerCountry);
+  if (edgeCache && cacheKey && res.status === 200) {
+    const toCache = new Response(res.clone().body, {
+      status: 200,
+      headers: {
+        "Content-Type": res.headers.get("Content-Type") || "application/json; charset=utf-8",
+        "Cache-Control": DATA_CACHE_CONTROL,
+      },
+    });
+    const putPromise = edgeCache.put(cacheKey, toCache);
+    if (ctx && typeof ctx.waitUntil === "function") {
+      ctx.waitUntil(putPromise);
+    } else {
+      await putPromise;
+    }
+  }
+  return res;
+}
+
+async function handleDataRoute(db, url, path, meta, request, headers, isCallerCountry) {
+  const dataHeaders = {
+    ...headers,
+    "Cache-Control": isCallerCountry ? "private, max-age=60" : DATA_CACHE_CONTROL,
+  };
 
   if (path === "/v1/country") {
     const raw = url.searchParams.get("query") || request.headers.get("CF-Connecting-IP") || "";
@@ -148,8 +209,7 @@ export async function handleRequest(db, request, env = {}) {
     if (!ip) {
       return errorResponse(400, "INVALID_IP", "query must be a valid IPv4 or IPv6 address", headers);
     }
-    const result = await db.lookupIP(ip);
-    const cc = result && result.location ? result.location.country_code : null;
+    const cc = db.lookupCountry(ip);
     if (!cc) {
       return errorResponse(404, "IP_NOT_FOUND", "no country code matched this IP", headers);
     }
@@ -157,12 +217,12 @@ export async function handleRequest(db, request, env = {}) {
       return jsonResponse(
         200,
         { meta: { dataset: meta }, ip: ip.canonical, version: ip.isV6 ? 6 : 4, country_code: cc },
-        headers
+        dataHeaders
       );
     }
     return new Response(cc + "\n", {
       status: 200,
-      headers: { "Content-Type": "text/plain; charset=utf-8", ...headers },
+      headers: { "Content-Type": "text/plain; charset=utf-8", ...dataHeaders },
     });
   }
 
@@ -175,6 +235,16 @@ export async function handleRequest(db, request, env = {}) {
     if (details !== "" && details !== "full") {
       return errorResponse(400, "INVALID_DETAILS", "details must be full when present", headers);
     }
+    if (url.searchParams.get("format") === "text") {
+      const cc = db.lookupCountry(ip);
+      if (!cc) {
+        return errorResponse(404, "IP_NOT_FOUND", "no country code matched this IP", headers);
+      }
+      return new Response(cc + "\n", {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8", ...dataHeaders },
+      });
+    }
     const result = await db.lookupIP(ip);
     if (!result) {
       return errorResponse(
@@ -184,17 +254,7 @@ export async function handleRequest(db, request, env = {}) {
         headers
       );
     }
-    if (url.searchParams.get("format") === "text") {
-      const cc = result.location.country_code;
-      if (!cc) {
-        return errorResponse(404, "IP_NOT_FOUND", "no country code matched this IP", headers);
-      }
-      return new Response(cc + "\n", {
-        status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8", ...headers },
-      });
-    }
-    return jsonResponse(200, { meta: { dataset: meta }, ...result }, headers);
+    return jsonResponse(200, { meta: { dataset: meta }, ...result }, dataHeaders);
   }
 
   if (path === "/v1/asn") {
@@ -222,7 +282,7 @@ export async function handleRequest(db, request, env = {}) {
     return jsonResponse(
       200,
       { meta: { dataset: meta }, asn: res.asn, as_number: res.as_number, autnum: res.autnum, routes },
-      headers
+      dataHeaders
     );
   }
 
@@ -262,7 +322,7 @@ export async function handleRequest(db, request, env = {}) {
         allocation: res.allocation,
         routes: { items: res.routes, next_cursor: res.nextCursor },
       },
-      headers
+      dataHeaders
     );
   }
 

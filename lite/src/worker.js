@@ -5,7 +5,7 @@ import { handleRequest } from "./handler.js";
 const db = new LiteDB(dbBuffer);
 
 export default {
-  fetch(request, env) {
-    return handleRequest(db, request, env);
+  fetch(request, env, ctx) {
+    return handleRequest(db, request, env, ctx);
   },
 };

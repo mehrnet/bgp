@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::sweep::Segment;
 
-pub const DEFAULT_BLOCK_SIZE: u8 = 128;
+pub const DEFAULT_BLOCK_SIZE: u8 = 64;
 pub const DEFAULT_ALLOC_V4_BITS: u8 = 32;
 pub const DEFAULT_ALLOC_V6_BITS: u8 = 64;
 pub const DEFAULT_GEO_V4_BITS: u8 = 32;
