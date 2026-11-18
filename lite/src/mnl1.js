@@ -18,6 +18,23 @@ function readUvarint(bytes, pos, end) {
   return null;
 }
 
+let _uvNext = 0;
+
+function readUv(bytes, pos, end) {
+  let x = 0;
+  let mul = 1;
+  for (let i = 0; pos < end && i < 10; i++) {
+    const b = bytes[pos++];
+    if (b < 0x80) {
+      _uvNext = pos;
+      return x + b * mul;
+    }
+    x += (b & 0x7f) * mul;
+    mul *= 128;
+  }
+  return -1;
+}
+
 function readUvarintBig(bytes, pos, end) {
   let x = 0n;
   let s = 0n;
@@ -30,6 +47,14 @@ function readUvarintBig(bytes, pos, end) {
     s += 7n;
   }
   return null;
+}
+
+function readOffsetDict(view, pos) {
+  const count = view.getUint32(pos, true);
+  const offsetsOff = pos + 4;
+  const dataOff = offsetsOff + (count + 1) * 4;
+  const totalBytes = view.getUint32(offsetsOff + count * 4, true);
+  return [{ isOffset: true, count, offsetsOff, dataOff }, dataOff + totalBytes];
 }
 
 function readLazyDict(bytes, pos) {
@@ -116,10 +141,11 @@ export class LiteDB {
       bytes[2] !== 0x4c || // L
       bytes[3] !== 0x31 || // 1
       ver < 3 ||
-      ver > 5
+      ver > 6
     ) {
       throw new Error("invalid MNL1 header");
     }
+    this.version = ver;
     this.bytes = bytes;
     this.view = view;
     this.flags = bytes[5];
@@ -148,11 +174,12 @@ export class LiteDB {
     this.ccCount = ccCount;
     pos += 2 * ccCount;
 
-    [this.registries, pos] = readLazyDict(bytes, pos);
-    [this.statuses, pos] = readLazyDict(bytes, pos);
-    [this.sources, pos] = readLazyDict(bytes, pos);
-    [this.regions, pos] = readLazyDict(bytes, pos);
-    [this.cities, pos] = readLazyDict(bytes, pos);
+    const readDict = ver >= 6 ? (p) => readOffsetDict(view, p) : (p) => readLazyDict(bytes, p);
+    [this.registries, pos] = readDict(pos);
+    [this.statuses, pos] = readDict(pos);
+    [this.sources, pos] = readDict(pos);
+    [this.regions, pos] = readDict(pos);
+    [this.cities, pos] = readDict(pos);
 
     this.geoLocCount = view.getUint32(pos, true);
     pos += 4;
@@ -166,7 +193,7 @@ export class LiteDB {
     this.asnNumbersOff = pos;
     pos += this.asnCount * 4;
     const isChunked = (this.flags & 4) !== 0;
-    if (isChunked) {
+    if (isChunked && ver < 6) {
       [this.autnumChunks, pos] = openChunkedSection(view, pos, this.asnCount);
       this.asnOffsetsOff = -1;
       this.asnDataOff = -1;
@@ -234,7 +261,7 @@ export class LiteDB {
       const cStart = section.dataOff + this.view.getUint32(section.offsetsOff + chunkIdx * 4, true);
       const cEnd = section.dataOff + this.view.getUint32(section.offsetsOff + (chunkIdx + 1) * 4, true);
       chunk = await inflateRaw(this.bytes.subarray(cStart, cEnd));
-      if (section.cache.size >= 32) {
+      if (section.cache.size >= 64) {
         section.cache.delete(section.cache.keys().next().value);
       }
       section.cache.set(chunkIdx, chunk);
@@ -251,7 +278,14 @@ export class LiteDB {
   }
 
   dictAt(dict, idx) {
-    if (idx <= 0 || idx > dict.lens.length) return null;
+    if (idx <= 0) return null;
+    if (dict.isOffset) {
+      if (idx > dict.count) return null;
+      const off = dict.dataOff + this.view.getUint32(dict.offsetsOff + (idx - 1) * 4, true);
+      const end = dict.dataOff + this.view.getUint32(dict.offsetsOff + idx * 4, true);
+      return decoder.decode(this.bytes.subarray(off, end));
+    }
+    if (idx > dict.lens.length) return null;
     const off = dict.offs[idx - 1];
     return decoder.decode(this.bytes.subarray(off, off + dict.lens[idx - 1]));
   }
@@ -262,49 +296,61 @@ export class LiteDB {
     return this.view.getUint32(this.routeValOff + (val - 1) * 4, true);
   }
 
-  async autnumByIdx(idx) {
-    if (idx < 1 || idx > this.asnCount) return { asNumber: 0, hasAutnum: false };
-    const asn = this.view.getUint32(this.asnNumbersOff + (idx - 1) * 4, true);
-    const { bytes, off, end } = await this.readChunkEntry(
-      this.autnumChunks,
-      this.asnOffsetsOff,
-      this.asnDataOff,
-      idx - 1
-    );
+  decodeAutnumFrom(bytes, off, end, asn, summaryOnly) {
     if (off >= end || bytes[off] === 0) {
       return { asNumber: asn, hasAutnum: false };
     }
     let p = off + 1;
-    const r1 = readUvarint(bytes, p, end);
-    const r2 = readUvarint(bytes, r1[1], end);
-    const r3 = readUvarint(bytes, r2[1], end);
-    const r4 = readUvarint(bytes, r3[1], end);
-    const r5 = readUvarint(bytes, r4[1], end);
-    p = r5[1];
-    const name = r5[0] > 0 ? decoder.decode(bytes.subarray(p, p + r5[0])) : null;
-    p += r5[0];
-    const r6 = readUvarint(bytes, p, end);
-    p = r6[1];
-    const org = r6[0] > 0 ? decoder.decode(bytes.subarray(p, p + r6[0])) : null;
-    p += r6[0];
-    const r7 = readUvarint(bytes, p, end);
-    p = r7[1];
-    const maintainers = r7[0] > 0 ? decoder.decode(bytes.subarray(p, p + r7[0])) : null;
-    p += r7[0];
-    const r8 = readUvarint(bytes, p, end);
-    p = r8[1];
-    const abuseContact = r8[0] > 0 ? decoder.decode(bytes.subarray(p, p + r8[0])) : null;
-    p += r8[0];
-    const r9 = readUvarint(bytes, p, end);
-    p = r9[1];
-    const description = r9[0] > 0 ? decoder.decode(bytes.subarray(p, p + r9[0])) : null;
+    if (summaryOnly) {
+      p = skipVarint(bytes, p, end);
+      if (p < 0) return { asNumber: asn, hasAutnum: false };
+      p = skipVarint(bytes, p, end);
+      if (p < 0) return { asNumber: asn, hasAutnum: false };
+      p = skipVarint(bytes, p, end);
+      if (p < 0) return { asNumber: asn, hasAutnum: false };
+      p = skipVarint(bytes, p, end);
+      if (p < 0) return { asNumber: asn, hasAutnum: false };
+      const nameLen = readUv(bytes, p, end);
+      if (nameLen < 0) return { asNumber: asn, hasAutnum: false };
+      p = _uvNext;
+      const name = nameLen > 0 ? decoder.decode(bytes.subarray(p, p + nameLen)) : null;
+      p += nameLen;
+      const orgLen = readUv(bytes, p, end);
+      if (orgLen < 0) return { asNumber: asn, hasAutnum: true, name, organization: null };
+      p = _uvNext;
+      const org = orgLen > 0 ? decoder.decode(bytes.subarray(p, p + orgLen)) : null;
+      return { asNumber: asn, hasAutnum: true, name, organization: org };
+    }
+    const r1 = readUv(bytes, p, end);
+    const r2 = readUv(bytes, _uvNext, end);
+    const r3 = readUv(bytes, _uvNext, end);
+    const r4 = readUv(bytes, _uvNext, end);
+    const nameLen = readUv(bytes, _uvNext, end);
+    p = _uvNext;
+    const name = nameLen > 0 ? decoder.decode(bytes.subarray(p, p + nameLen)) : null;
+    p += nameLen;
+    const orgLen = readUv(bytes, p, end);
+    p = _uvNext;
+    const org = orgLen > 0 ? decoder.decode(bytes.subarray(p, p + orgLen)) : null;
+    p += orgLen;
+    const mntLen = readUv(bytes, p, end);
+    p = _uvNext;
+    const maintainers = mntLen > 0 ? decoder.decode(bytes.subarray(p, p + mntLen)) : null;
+    p += mntLen;
+    const acLen = readUv(bytes, p, end);
+    p = _uvNext;
+    const abuseContact = acLen > 0 ? decoder.decode(bytes.subarray(p, p + acLen)) : null;
+    p += acLen;
+    const descLen = readUv(bytes, p, end);
+    p = _uvNext;
+    const description = descLen > 0 ? decoder.decode(bytes.subarray(p, p + descLen)) : null;
     return {
       asNumber: asn,
       hasAutnum: true,
-      registry: this.dictAt(this.registries, r1[0]),
-      country: this.countryAt(r2[0]),
-      status: this.dictAt(this.statuses, r3[0]),
-      source: this.dictAt(this.sources, r4[0]),
+      registry: this.dictAt(this.registries, r1),
+      country: this.countryAt(r2),
+      status: this.dictAt(this.statuses, r3),
+      source: this.dictAt(this.sources, r4),
       name,
       organization: org,
       maintainers,
@@ -313,26 +359,55 @@ export class LiteDB {
     };
   }
 
-  async resolveASNSet(val) {
+  autnumByIdxSync(idx, summaryOnly = false) {
+    if (idx < 1 || idx > this.asnCount) return { asNumber: 0, hasAutnum: false };
+    const asn = this.view.getUint32(this.asnNumbersOff + (idx - 1) * 4, true);
+    const off = this.asnDataOff + this.view.getUint32(this.asnOffsetsOff + (idx - 1) * 4, true);
+    const end = this.asnDataOff + this.view.getUint32(this.asnOffsetsOff + idx * 4, true);
+    return this.decodeAutnumFrom(this.bytes, off, end, asn, summaryOnly);
+  }
+
+  async autnumByIdx(idx, summaryOnly = false) {
+    if (!this.autnumChunks) return this.autnumByIdxSync(idx, summaryOnly);
+    if (idx < 1 || idx > this.asnCount) return { asNumber: 0, hasAutnum: false };
+    const asn = this.view.getUint32(this.asnNumbersOff + (idx - 1) * 4, true);
+    const { bytes, off, end } = await this.readChunkEntry(
+      this.autnumChunks,
+      this.asnOffsetsOff,
+      this.asnDataOff,
+      idx - 1
+    );
+    return this.decodeAutnumFrom(bytes, off, end, asn, summaryOnly);
+  }
+
+  resolveASNSet(val, summaryOnly = false) {
     if (val === 0) return [];
     if (val <= this.asnCount) {
-      return [await this.autnumByIdx(val)];
+      if (!this.autnumChunks) return [this.autnumByIdxSync(val, summaryOnly)];
+      return this.autnumByIdx(val, summaryOnly).then((r) => [r]);
     }
     const mIdx = val - this.asnCount - 1;
     if (mIdx < 0 || mIdx >= this.multiCount) return [];
     const off = this.multiDataOff + this.view.getUint32(this.multiOffsetsOff + mIdx * 4, true);
     const end = this.multiDataOff + this.view.getUint32(this.multiOffsetsOff + (mIdx + 1) * 4, true);
-    const c = readUvarint(this.bytes, off, end);
-    if (!c) return [];
-    const count = c[0];
-    let p = c[1];
+    const count = readUv(this.bytes, off, end);
+    if (count < 0) return [];
+    let p = _uvNext;
     const indices = new Array(count);
     for (let i = 0; i < count; i++) {
-      const r = readUvarint(this.bytes, p, end);
-      indices[i] = r[0];
-      p = r[1];
+      const v = readUv(this.bytes, p, end);
+      if (v < 0) return [];
+      indices[i] = v;
+      p = _uvNext;
     }
-    return Promise.all(indices.map((i) => this.autnumByIdx(i)));
+    if (!this.autnumChunks) {
+      const out = new Array(count);
+      for (let i = 0; i < count; i++) {
+        out[i] = this.autnumByIdxSync(indices[i], summaryOnly);
+      }
+      return out;
+    }
+    return Promise.all(indices.map((i) => this.autnumByIdx(i, summaryOnly)));
   }
 
   findBlock4(table, keyNum) {
@@ -461,6 +536,46 @@ export class LiteDB {
     return { segStart: prevStart, nextStart: 0n, hasNext: false, pStart: prevPStart, pEnd: prevPEnd };
   }
 
+  lookupCountry(parsedIP) {
+    const isV6 = parsedIP.isV6;
+    const geoTable = isV6 ? this.geoV6 : this.geoV4;
+    const geoKey = isV6
+      ? (parsedIP.value >> 64n) >> BigInt(64 - this.geoV6B)
+      : parsedIP.value >>> (32 - this.geoV4B);
+    const geoSeg = isV6
+      ? this.findSeg(geoTable, geoKey, skipGeo)
+      : this.findSeg4(geoTable, geoKey, skipGeo);
+    if (geoSeg) {
+      const locID = readUv(this.bytes, geoSeg.pStart, geoSeg.pEnd);
+      if (locID > 0 && locID <= this.geoLocCount) {
+        const idx = locID - 1;
+        const off = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + idx * 4, true);
+        const end = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + (idx + 1) * 4, true);
+        const ccId = readUv(this.bytes, off, end);
+        if (ccId >= 0) {
+          const cc = this.countryAt(ccId);
+          if (cc) return cc;
+        }
+      }
+    }
+
+    const allocTable = isV6 ? this.allocV6 : this.allocV4;
+    const allocKey = isV6
+      ? (parsedIP.value >> 64n) >> BigInt(64 - this.allocV6B)
+      : parsedIP.value >>> (32 - this.allocV4B);
+    const allocSeg = isV6
+      ? this.findSeg(allocTable, allocKey, skipAlloc)
+      : this.findSeg4(allocTable, allocKey, skipAlloc);
+    if (allocSeg) {
+      const regId = readUv(this.bytes, allocSeg.pStart, allocSeg.pEnd);
+      if (regId >= 0) {
+        const ccId = readUv(this.bytes, _uvNext, allocSeg.pEnd);
+        if (ccId >= 0) return this.countryAt(ccId);
+      }
+    }
+    return null;
+  }
+
   async lookupIP(parsedIP) {
     const isV6 = parsedIP.isV6;
     const allocTable = isV6 ? this.allocV6 : this.allocV4;
@@ -486,12 +601,12 @@ export class LiteDB {
       ? this.findSeg(allocTable, allocKey, skipAlloc)
       : this.findSeg4(allocTable, allocKey, skipAlloc);
     if (allocSeg) {
-      const r1 = readUvarint(this.bytes, allocSeg.pStart, allocSeg.pEnd);
-      const r2 = readUvarint(this.bytes, r1[1], allocSeg.pEnd);
-      if (r1[0] !== 0 || r2[0] !== 0) {
+      const regId = readUv(this.bytes, allocSeg.pStart, allocSeg.pEnd);
+      const ccId = regId >= 0 ? readUv(this.bytes, _uvNext, allocSeg.pEnd) : -1;
+      if (ccId >= 0 && (regId !== 0 || ccId !== 0)) {
         hasAlloc = true;
-        registry = this.dictAt(this.registries, r1[0]);
-        allocCC = this.countryAt(r2[0]);
+        registry = this.dictAt(this.registries, regId);
+        allocCC = this.countryAt(ccId);
         [allocStart, allocEnd] = slotBoundsToStrings(isV6, allocTable.bits, allocSeg.segStart, allocSeg.nextStart, allocSeg.hasNext);
       }
     }
@@ -504,20 +619,19 @@ export class LiteDB {
       ? this.findSeg(geoTable, geoKey, skipGeo)
       : this.findSeg4(geoTable, geoKey, skipGeo);
     if (geoSeg) {
-      const r1 = readUvarint(this.bytes, geoSeg.pStart, geoSeg.pEnd);
-      const locID = r1 ? r1[0] : 0;
+      const locID = readUv(this.bytes, geoSeg.pStart, geoSeg.pEnd);
       if (locID > 0 && locID <= this.geoLocCount) {
         const idx = locID - 1;
         const off = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + idx * 4, true);
         const end = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + (idx + 1) * 4, true);
-        const a = readUvarint(this.bytes, off, end);
-        const b = a && readUvarint(this.bytes, a[1], end);
-        const c = b && readUvarint(this.bytes, b[1], end);
-        if (c) {
+        const ccId = readUv(this.bytes, off, end);
+        const regId = ccId >= 0 ? readUv(this.bytes, _uvNext, end) : -1;
+        const cityId = regId >= 0 ? readUv(this.bytes, _uvNext, end) : -1;
+        if (cityId >= 0) {
           hasGeo = true;
-          geoCC = this.countryAt(a[0]);
-          geoRegion = this.dictAt(this.regions, b[0]);
-          geoCity = this.dictAt(this.cities, c[0]);
+          geoCC = this.countryAt(ccId);
+          geoRegion = this.dictAt(this.regions, regId);
+          geoCity = this.dictAt(this.cities, cityId);
         }
       }
     }
@@ -531,8 +645,8 @@ export class LiteDB {
     if (routeSeg && routeSeg.pStart < routeSeg.pEnd) {
       const bits = this.bytes[routeSeg.pStart];
       if (bits > 0) {
-        const r1 = readUvarint(this.bytes, routeSeg.pStart + 1, routeSeg.pEnd);
-        const rawRouteVal = r1 ? this.resolveRouteVal(r1[0]) : 0;
+        const rVal = readUv(this.bytes, routeSeg.pStart + 1, routeSeg.pEnd);
+        const rawRouteVal = rVal >= 0 ? this.resolveRouteVal(rVal) : 0;
         if (rawRouteVal !== 0) {
           hasRoute = true;
           if (isV6) {
@@ -542,7 +656,8 @@ export class LiteDB {
             const { start, end, cidr } = maskIPv4Range(parsedIP.value, bits);
             routeNet = { cidr, startIP: formatIPv4(start), endIP: formatIPv4(end) };
           }
-          routeASNs = await this.resolveASNSet(rawRouteVal);
+          const resolved = this.resolveASNSet(rawRouteVal, true);
+          routeASNs = this.autnumChunks ? await resolved : resolved;
         }
       }
     }
@@ -711,9 +826,9 @@ export class LiteDB {
       ? this.findSeg(allocTable, allocKey, skipAlloc)
       : this.findSeg4(allocTable, allocKey, skipAlloc);
     if (allocSeg) {
-      const r1 = readUvarint(this.bytes, allocSeg.pStart, allocSeg.pEnd);
-      const r2 = readUvarint(this.bytes, r1[1], allocSeg.pEnd);
-      if (r1[0] !== 0 || r2[0] !== 0) {
+      const regId = readUv(this.bytes, allocSeg.pStart, allocSeg.pEnd);
+      const ccId = regId >= 0 ? readUv(this.bytes, _uvNext, allocSeg.pEnd) : -1;
+      if (ccId >= 0 && (regId !== 0 || ccId !== 0)) {
         const [startIP, endIP] = slotBoundsToStrings(
           isV6,
           allocTable.bits,
@@ -721,8 +836,8 @@ export class LiteDB {
           allocSeg.nextStart,
           allocSeg.hasNext
         );
-        const reg = this.dictAt(this.registries, r1[0]);
-        const cc = this.countryAt(r2[0]);
+        const reg = this.dictAt(this.registries, regId);
+        const cc = this.countryAt(ccId);
         allocation = {
           start_ip: startIP,
           end_ip: endIP,
@@ -745,14 +860,96 @@ export class LiteDB {
     }
 
     // Collect distinct route CIDRs covering [start, end] from the flattened LPM table.
-    const startKey = isV6 ? parsedPrefix.start >> 64n : BigInt(parsedPrefix.start >>> 0);
-    const endKey = isV6 ? parsedPrefix.end >> 64n : BigInt(parsedPrefix.end >>> 0);
-
     const routes = [];
     const seen = new Set();
     let matched = 0;
     let scanned = 0;
     let nextCursor = null;
+
+    if (!isV6) {
+      const startNum = parsedPrefix.start >>> 0;
+      const endNum = parsedPrefix.end >>> 0;
+      let b = this.findBlock4(routeTable, startNum);
+      if (b < 0) b = 0;
+      const shiftMul = 1 << routeTable.shift;
+      outer4: for (; b < routeTable.blocks; b++) {
+        let curKey = getKeyNum(this.bytes, routeTable.indexOff + b * routeTable.stride, routeTable.kb);
+        let off =
+          routeTable.dataOff +
+          this.view.getUint32(routeTable.indexOff + b * routeTable.stride + routeTable.kb, true);
+        const end =
+          b + 1 < routeTable.blocks
+            ? routeTable.dataOff +
+              this.view.getUint32(routeTable.indexOff + (b + 1) * routeTable.stride + routeTable.kb, true)
+            : routeTable.dataOff + routeTable.dataLen;
+
+        while (off < end) {
+          if (++scanned > 20000) return { tooBroad: true };
+          const enc = readUv(this.bytes, off, end);
+          if (enc < 0) break outer4;
+          const pStart = _uvNext;
+          const delta =
+            routeTable.shift === 0
+              ? enc
+              : enc % 2 === 0
+                ? Math.floor(enc / 2) * shiftMul
+                : Math.floor(enc / 2);
+          curKey += delta;
+          const nextOff = skipRoute(this.bytes, pStart, end);
+          if (nextOff < 0 || curKey > endNum) break outer4;
+
+          const bits = this.bytes[pStart];
+          if (bits > 0) {
+            const rVal = readUv(this.bytes, pStart + 1, nextOff);
+            const rawRouteVal = rVal >= 0 ? this.resolveRouteVal(rVal) : 0;
+            if (rawRouteVal !== 0) {
+              const masked = maskIPv4Range(curKey >>> 0, bits);
+              if (masked.end >= startNum && masked.start <= endNum) {
+                const resolved = this.resolveASNSet(rawRouteVal, false);
+                const asns = this.autnumChunks ? await resolved : resolved;
+                for (const a of asns) {
+                  const key = `${masked.cidr}|${a.asNumber}`;
+                  if (seen.has(key)) continue;
+                  seen.add(key);
+                  if (matched >= cursorOffset) {
+                    if (routes.length >= limit) {
+                      nextCursor = String(matched);
+                      break outer4;
+                    }
+                    const relation =
+                      bits === parsedPrefix.bits
+                        ? "exact"
+                        : bits < parsedPrefix.bits
+                          ? "covering"
+                          : "more_specific";
+                    routes.push({
+                      prefix: masked.cidr,
+                      version: 4,
+                      origin_asn: `AS${a.asNumber}`,
+                      as_number: a.asNumber,
+                      relation,
+                      registry: a.hasAutnum ? a.registry : null,
+                      source: a.hasAutnum ? a.source : null,
+                      maintainers: null,
+                      organization: a.hasAutnum ? a.organization : null,
+                      abuse_contact: null,
+                      description: null,
+                    });
+                  }
+                  matched++;
+                }
+              }
+            }
+          }
+          off = nextOff;
+        }
+      }
+      if (!allocation && routes.length === 0) return null;
+      return { allocation, routes, nextCursor };
+    }
+
+    const startKey = parsedPrefix.start >> 64n;
+    const endKey = parsedPrefix.end >> 64n;
 
     let b = this.findBlock(routeTable, startKey);
     if (b < 0) b = 0;
@@ -779,14 +976,14 @@ export class LiteDB {
         // Check if this segment reaches >= startKey (we also include the segment right before startKey if it covers startKey).
         const bits = this.bytes[pStart];
         if (bits > 0) {
-          const r1 = readUvarint(this.bytes, pStart + 1, nextOff);
-          const rawRouteVal = r1 ? this.resolveRouteVal(r1[0]) : 0;
+          const rVal = readUv(this.bytes, pStart + 1, nextOff);
+          const rawRouteVal = rVal >= 0 ? this.resolveRouteVal(rVal) : 0;
           if (rawRouteVal !== 0) {
-            const addrVal = isV6 ? curKey << 64n : Number(curKey) >>> 0;
-            const masked = isV6 ? maskIPv6Range(addrVal, bits) : maskIPv4Range(addrVal, bits);
+            const masked = maskIPv6Range(curKey << 64n, bits);
             // Only emit if masked range overlaps [parsedPrefix.start, parsedPrefix.end].
             if (masked.end >= parsedPrefix.start && masked.start <= parsedPrefix.end) {
-              const asns = await this.resolveASNSet(rawRouteVal);
+              const resolved = this.resolveASNSet(rawRouteVal, false);
+              const asns = this.autnumChunks ? await resolved : resolved;
               for (const a of asns) {
                 const key = `${masked.cidr}|${a.asNumber}`;
                 if (seen.has(key)) continue;
@@ -804,7 +1001,7 @@ export class LiteDB {
                         : "more_specific";
                   routes.push({
                     prefix: masked.cidr,
-                    version: isV6 ? 6 : 4,
+                    version: 6,
                     origin_asn: `AS${a.asNumber}`,
                     as_number: a.asNumber,
                     relation,
@@ -853,9 +1050,9 @@ function skipRoute(bytes, pos, end) {
 
 function slotBoundsToStrings(isV6, bits, startSlot, nextSlot, hasNext) {
   if (!isV6) {
-    const shift = BigInt(32 - bits);
-    const s = Number((BigInt(startSlot) << shift) & 0xffffffffn) >>> 0;
-    const e = hasNext ? Number(((BigInt(nextSlot) << shift) - 1n) & 0xffffffffn) >>> 0 : 0xffffffff >>> 0;
+    const shift = 32 - bits;
+    const s = shift >= 32 ? 0 : (startSlot << shift) >>> 0;
+    const e = hasNext ? (((shift >= 32 ? 0 : nextSlot << shift) - 1) >>> 0) : 0xffffffff;
     return [formatIPv4(s), formatIPv4(e)];
   }
   const shift = BigInt(64 - bits);

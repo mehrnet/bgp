@@ -124,6 +124,7 @@ test("health and root endpoints", async () => {
   const r = await call("/v1/health", { headers: { Origin: "https://bgp.mehrnet.com" } });
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("Access-Control-Allow-Origin"), "https://bgp.mehrnet.com");
+  assert.equal(r.headers.get("Cache-Control"), "no-store");
   const body = r.json();
   assert.equal(body.ok, true);
   assert.equal(body.service, "bgp-api");
@@ -184,10 +185,16 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(rm.json().ip, "1.1.1.1");
   assert.equal(rm.json().version, 4);
 
-  // Plain-text shortcut
+  // Plain-text and fast-path country shortcuts
   const rc = await call("/v1/country?query=1.1.1.1");
   assert.equal(rc.status, 200);
+  assert.equal(rc.headers.get("Cache-Control"), "public, max-age=3600, s-maxage=86400");
   assert.equal(rc.text.trim(), "US");
+  assert.equal((await call("/v1/country?query=1.0.5.5")).text.trim(), "AU");
+  assert.equal((await call("/v1/ip?query=1.1.1.1&format=text")).text.trim(), "US");
+  const rc6 = await call("/v1/country?query=2606:4700:4700::1&format=json");
+  assert.equal(rc6.json().country_code, "GB");
+  assert.equal(b1.network.origins[0].organization, "ORG-CLOUD14-ARIN");
 });
 
 test("v1/asn and v1/prefix", async () => {
@@ -208,6 +215,13 @@ test("v1/asn and v1/prefix", async () => {
   assert.equal(pb.prefix.cidr, "1.1.0.0/16");
   assert.equal(pb.allocation.country_code, "AU");
   assert.ok(pb.routes.items.length >= 3);
+
+  const p6 = await call("/v1/prefix?prefix=2606:4700:4700::/48");
+  assert.equal(p6.status, 200);
+  assert.deepEqual(
+    p6.json().routes.items.map((r) => r.origin_asn),
+    ["AS13335", "AS64512"]
+  );
 
   // Chunk > 0 ASN + unaligned /25 shifted-delta route
   const aChunk1 = await call("/v1/asn?query=AS65300");

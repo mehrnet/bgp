@@ -82,9 +82,26 @@ fn lite_db_encodes_valid_mnl1_header_and_tables() -> Result<(), Box<dyn std::err
 
     let mut buf = Vec::new();
     let stats = b.encode(&mut buf)?;
-    assert_eq!(buf.get(..5), Some(&b"MNL1\x05"[..]));
-    assert_eq!(buf.get(5), Some(&0b0000_1111));
-    assert_eq!(buf.get(7..13), Some(&[32, 64, 32, 64, 32, 64][..]));
+    assert_eq!(
+        buf.get(..13),
+        Some(
+            &[
+                b'M',
+                b'N',
+                b'L',
+                b'1',
+                6,
+                0b0000_1111,
+                64,
+                32,
+                64,
+                32,
+                64,
+                32,
+                64
+            ][..]
+        )
+    );
     assert_eq!(stats.autnums, 1);
     assert_eq!(stats.multi_asn_sets, 1);
     assert_eq!(stats.asn_route_items, 2);

@@ -126,11 +126,15 @@ pub(crate) fn write_dicts(buf: &mut Vec<u8>, d: &CompactDicts) {
         &d.regions,
         &d.cities,
     ] {
-        write_uvarint(buf, dict.len() as u64);
+        buf.extend_from_slice(&(dict.len() as u32).to_le_bytes());
+        let mut data = Vec::new();
+        let mut offsets = Vec::with_capacity(dict.len() + 1);
         for s in dict {
-            write_uvarint(buf, s.len() as u64);
-            buf.extend_from_slice(s.as_bytes());
+            offsets.push(data.len() as u32);
+            data.extend_from_slice(s.as_bytes());
         }
+        offsets.push(data.len() as u32);
+        write_offset_data(buf, &offsets, &data);
     }
 }
 
