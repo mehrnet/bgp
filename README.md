@@ -132,8 +132,9 @@ measurement. It is a development operation, not a runtime dependency; Rust (`car
 on the machine that runs the script.
 
 ```sh
-BGP_API_ORIGIN_HOST=root@78.31.250.179 \
-BGP_API_EXTERNAL_HOST=root@138.199.236.120 \
+BGP_API_ORIGIN_HOST=root@origin.example.com \
+BGP_API_ORIGIN_IP=198.51.100.10 \
+BGP_API_EXTERNAL_HOST=root@client.example.com \
 ./scripts/benchmark-production.sh
 ```
 
