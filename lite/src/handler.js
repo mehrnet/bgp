@@ -66,13 +66,36 @@ function errorResponse(status, code, message, extraHeaders) {
   return jsonResponse(status, { error: { code, message } }, extraHeaders);
 }
 
-function datasetMeta(db) {
-  return {
-    release_tag: db.meta.release_tag || null,
-    built_at: db.meta.built_at || null,
-    activated_at: db.meta.built_at || null,
-    source_commit: db.meta.source_commit || null,
-  };
+const ROOT_JSON = JSON.stringify({ ok: true, service: "bgp-api", mode: "lite", version: 1 }) + "\n";
+const DB_STATIC_CACHE = new WeakMap();
+
+function getDbStatic(db) {
+  let cached = DB_STATIC_CACHE.get(db);
+  if (!cached) {
+    const meta = {
+      release_tag: db.meta.release_tag || null,
+      built_at: db.meta.built_at || null,
+      activated_at: db.meta.built_at || null,
+      source_commit: db.meta.source_commit || null,
+    };
+    const healthJson =
+      JSON.stringify({
+        ok: true,
+        service: "bgp-api",
+        mode: "lite",
+        version: 1,
+        database: "lite",
+        build: {
+          version: meta.release_tag,
+          commit: meta.source_commit,
+          built_at: meta.built_at,
+        },
+        dataset: meta,
+      }) + "\n";
+    cached = { meta, healthJson };
+    DB_STATIC_CACHE.set(db, cached);
+  }
+  return cached;
 }
 
 function parsePage(url) {
@@ -140,31 +163,21 @@ export async function handleRequest(db, request, env = {}, ctx = null) {
 
   const url = new URL(request.url);
   const path = url.pathname;
-  const meta = datasetMeta(db);
+  const { meta, healthJson } = getDbStatic(db);
   const noStoreHeaders = { ...headers, "Cache-Control": "no-store" };
 
   if (path === "/") {
-    return jsonResponse(200, { ok: true, service: "bgp-api", mode: "lite", version: 1 }, noStoreHeaders);
+    return new Response(ROOT_JSON, {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8", ...noStoreHeaders },
+    });
   }
 
   if (path === "/v1/health") {
-    return jsonResponse(
-      200,
-      {
-        ok: true,
-        service: "bgp-api",
-        mode: "lite",
-        version: 1,
-        database: "lite",
-        build: {
-          version: meta.release_tag,
-          commit: meta.source_commit,
-          built_at: meta.built_at,
-        },
-        dataset: meta,
-      },
-      noStoreHeaders
-    );
+    return new Response(healthJson, {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8", ...noStoreHeaders },
+    });
   }
 
   const isCallerCountry = path === "/v1/country" && !url.searchParams.get("query");
@@ -267,7 +280,7 @@ async function handleDataRoute(db, url, path, meta, request, headers, isCallerCo
       return errorResponse(400, page.error[0], page.error[1], headers);
     }
     const offset = page.numbered ? (page.page - 1) * page.limit : page.cursor;
-    const res = await db.lookupASN(asNumber, offset, page.limit);
+    const res = await db.lookupASN(asNumber, offset, page.limit, page.numbered);
     if (!res) {
       return errorResponse(404, "ASN_NOT_FOUND", "no aut-num or route record matched this ASN", headers);
     }

@@ -1,17 +1,37 @@
 // IPv4 and IPv6 parsing, canonical formatting, CIDR math, and BigInt address counts.
 
 export function parseIPv4(input) {
-  const parts = input.split(".");
-  if (parts.length !== 4) return null;
+  const len = input.length;
+  if (len < 7 || len > 15) return null;
   let val = 0;
-  for (let i = 0; i < 4; i++) {
-    const p = parts[i];
-    if (!/^(0|[1-9]\d{0,2})$/.test(p)) return null;
-    const n = Number(p);
-    if (n > 255) return null;
-    val = (val << 8) | n;
+  let dots = 0;
+  let part = 0;
+  let partLen = 0;
+  let leadingZero = false;
+  for (let i = 0; i < len; i++) {
+    const ch = input.charCodeAt(i);
+    if (ch === 46) {
+      if (partLen === 0 || dots === 3) return null;
+      val = (val << 8) | part;
+      dots++;
+      part = 0;
+      partLen = 0;
+      leadingZero = false;
+    } else if (ch >= 48 && ch <= 57) {
+      if (partLen === 0) {
+        leadingZero = ch === 48;
+      } else if (leadingZero || partLen === 3) {
+        return null;
+      }
+      part = part * 10 + (ch - 48);
+      if (part > 255) return null;
+      partLen++;
+    } else {
+      return null;
+    }
   }
-  return val >>> 0;
+  if (dots !== 3 || partLen === 0) return null;
+  return ((val << 8) | part) >>> 0;
 }
 
 export function formatIPv4(val) {

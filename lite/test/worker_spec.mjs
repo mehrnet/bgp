@@ -209,12 +209,23 @@ test("v1/asn and v1/prefix", async () => {
   assert.equal(ab.routes.total_items, 5);
   assert.equal(ab.routes.total_pages, 3);
 
+  const aCur = (await call("/v1/asn?query=AS13335&limit=2")).json();
+  assert.equal(aCur.routes.items.length, 2);
+  assert.equal(aCur.routes.next_cursor, "2");
+  assert.equal(aCur.routes.total_items, undefined);
+  const aCurEnd = (await call("/v1/asn?query=AS13335&cursor=4&limit=2")).json();
+  assert.equal(aCurEnd.routes.items.length, 1);
+  assert.equal(aCurEnd.routes.next_cursor, null);
+
   const p1 = await call("/v1/prefix?prefix=1.1.0.0/16");
   assert.equal(p1.status, 200);
   const pb = p1.json();
   assert.equal(pb.prefix.cidr, "1.1.0.0/16");
   assert.equal(pb.allocation.country_code, "AU");
   assert.ok(pb.routes.items.length >= 3);
+  const pCur = (await call("/v1/prefix?prefix=1.1.0.0/16&cursor=2&limit=2")).json();
+  assert.equal(pCur.routes.items.length, 2);
+  assert.deepEqual(pCur.routes.items[0], pb.routes.items[2]);
 
   const p6 = await call("/v1/prefix?prefix=2606:4700:4700::/48");
   assert.equal(p6.status, 200);
@@ -235,6 +246,9 @@ test("v1/asn and v1/prefix", async () => {
 
 test("validation and 404 errors match contract", async () => {
   assert.equal((await call("/v1/ip?query=not-an-ip")).json().error.code, "INVALID_IP");
+  assert.equal((await call("/v1/ip?query=01.1.1.1")).json().error.code, "INVALID_IP");
+  assert.equal((await call("/v1/ip?query=1.2.3.256")).json().error.code, "INVALID_IP");
+  assert.equal((await call("/v1/ip?query=0.0.0.0")).json().error.code, "IP_NOT_FOUND");
   assert.equal((await call("/v1/ip?query=9.9.9.9")).json().error.code, "IP_NOT_FOUND");
   assert.equal((await call("/v1/asn?query=abc")).json().error.code, "INVALID_ASN");
   assert.equal((await call("/v1/asn?query=AS999999")).json().error.code, "ASN_NOT_FOUND");
