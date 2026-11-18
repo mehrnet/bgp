@@ -87,7 +87,7 @@ jobs:
       - name: Download RIR data
         run: aria2c -x 16 -s 16 -j 5 --dir=raw_data --input-file=urls.txt
       - name: Parse source records
-        run: cargo run --manifest-path rust/Cargo.toml --release --bin parse-rir -- ${{ matrix.rir }}
+        run: cargo run --manifest-path rust/Cargo.toml -p bgp-tools --release --bin parse-rir -- ${{ matrix.rir }}
       - uses: actions/upload-artifact@v6
         with:
           name: data-${{ matrix.rir }}
@@ -125,7 +125,7 @@ jobs:
           touch artifacts/geofeeds_dummy.txt
           cat artifacts/geofeeds_*.txt | sort -u > final_data/geofeeds.txt
       - name: Fetch geofeeds
-        run: cargo run --manifest-path rust/Cargo.toml --release --bin fetch-geofeeds
+        run: cargo run --manifest-path rust/Cargo.toml -p bgp-tools --release --bin fetch-geofeeds
       - uses: actions/upload-artifact@v6
         with:
           name: geofeed-locations
@@ -175,7 +175,7 @@ jobs:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          cargo build --manifest-path rust/Cargo.toml --release --bin build-mmap-dataset
+          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-mmap-dataset
           ./rust/target/release/build-mmap-dataset \
             -input final_data \
             -output mehrnet_bgp.mmap \
@@ -190,7 +190,7 @@ jobs:
           BGP_API_VALIDATE_ONLY: "1"
         run: |
           cargo test --manifest-path rust/Cargo.toml -p mnmf-store -p bgp-api-core -p bgp-api-server
-          cargo build --manifest-path rust/Cargo.toml --release --bin bgp-api
+          cargo build --manifest-path rust/Cargo.toml -p bgp-api-server --release --bin bgp-api
           ./rust/target/release/bgp-api
       - name: Build immutable SQLite database
         if: matrix.format == 'sqlite'
@@ -198,7 +198,7 @@ jobs:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          cargo build --manifest-path rust/Cargo.toml --release \
+          cargo build --manifest-path rust/Cargo.toml -p bgp-sqlite --release \
             --bin build-sqlite-dataset \
             --bin build-prefix-index \
             --bin build-range-summaries \
@@ -251,7 +251,7 @@ jobs:
         run: |
           cat artifacts/allocations_*.csv > final_data/allocations.csv
           cargo test --manifest-path rust/Cargo.toml -p bgp-compact
-          cargo build --manifest-path rust/Cargo.toml --release --bin build-country-db
+          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-country-db
           ./rust/target/release/build-country-db -input final_data -output country.mncc
           test -s country.mncc
       - name: Upload country database
@@ -301,7 +301,7 @@ jobs:
           test -s final_data/geolocations.csv
           cargo test --manifest-path rust/Cargo.toml -p bgp-compact
           npm --prefix workers/bgp-lite test
-          cargo build --manifest-path rust/Cargo.toml --release --bin build-lite-db
+          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-lite-db
           ./rust/target/release/build-lite-db \
             -input final_data \
             -output workers/bgp-lite/bgp-lite.mnl \
@@ -359,7 +359,7 @@ jobs:
             arch="$1"
             target="$2"
             binary="bgp-api-linux-${arch}"
-            cargo build --manifest-path rust/Cargo.toml --release --target "$target" --bin bgp-api
+            cargo build --manifest-path rust/Cargo.toml -p bgp-api-server --release --target "$target" --bin bgp-api
             cp "rust/target/${target}/release/bgp-api" "release/bin/$binary"
             chmod 0755 "release/bin/$binary"
             file "release/bin/$binary"

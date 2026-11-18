@@ -159,7 +159,6 @@ fn next_sweep_pos(top: &Interval, next_start: Option<u64>) -> Option<u64> {
     Some(next_start.map_or(after, |ns| ns.min(after)))
 }
 
-#[must_use]
 pub fn same_cidr_block(bits: u8) -> Box<dyn Fn(u64, u64, u8) -> bool> {
     Box::new(move |prev_start, curr_start, prefix_len| {
         if prefix_len == 0 {

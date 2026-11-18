@@ -60,7 +60,7 @@ go run ./cmd/build-mmap-dataset \
   -source-commit abcdef >/dev/null
 
 go build -o "$work_dir/bgp-api-go" ./cmd/bgp-api
-cargo build --manifest-path rust/Cargo.toml --bin bgp-api
+cargo build --manifest-path rust/Cargo.toml -p bgp-api-server --bin bgp-api
 rs_bin="$ROOT_DIR/rust/target/debug/bgp-api"
 
 BGP_API_DATABASE_PATH="$work_dir/test.mmap" BGP_API_VALIDATE_ONLY=1 "$rs_bin"
