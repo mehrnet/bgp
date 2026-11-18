@@ -50,9 +50,10 @@ jobs:
         rir: [ripe, apnic, afrinic, lacnic, arin]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.25"
+          workspaces: "rust -> target"
       - name: Install download client
         run: sudo apt-get update && sudo apt-get install -y aria2
       - name: Select RIR source files
@@ -86,7 +87,7 @@ jobs:
       - name: Download RIR data
         run: aria2c -x 16 -s 16 -j 5 --dir=raw_data --input-file=urls.txt
       - name: Parse source records
-        run: go run ./cmd/parse-rir ${{ matrix.rir }}
+        run: cargo run --manifest-path rust/Cargo.toml --release --bin parse-rir -- ${{ matrix.rir }}
       - uses: actions/upload-artifact@v6
         with:
           name: data-${{ matrix.rir }}
@@ -109,9 +110,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.25"
+          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: geofeeds-*
@@ -123,7 +125,7 @@ jobs:
           touch artifacts/geofeeds_dummy.txt
           cat artifacts/geofeeds_*.txt | sort -u > final_data/geofeeds.txt
       - name: Fetch geofeeds
-        run: go run ./cmd/fetch-geofeeds
+        run: cargo run --manifest-path rust/Cargo.toml --release --bin fetch-geofeeds
       - uses: actions/upload-artifact@v6
         with:
           name: geofeed-locations
@@ -148,9 +150,10 @@ jobs:
             asset: mehrnet_bgp_sqlite.tar.zst
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.25"
+          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: data-*
@@ -172,8 +175,8 @@ jobs:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          go build -trimpath -o build-mmap-dataset ./cmd/build-mmap-dataset
-          ./build-mmap-dataset \
+          cargo build --manifest-path rust/Cargo.toml --release --bin build-mmap-dataset
+          ./rust/target/release/build-mmap-dataset \
             -input final_data \
             -output mehrnet_bgp.mmap \
             -release-tag "$RELEASE_TAG" \
@@ -186,28 +189,29 @@ jobs:
           BGP_API_DATABASE_PATH: ${{ github.workspace }}/mehrnet_bgp.mmap
           BGP_API_VALIDATE_ONLY: "1"
         run: |
-          go test ./internal/api ./internal/mmapstore
-          go build -trimpath -o bgp-api ./cmd/bgp-api
-          ./bgp-api
+          cargo test --manifest-path rust/Cargo.toml -p mnmf-store -p bgp-api-core -p bgp-api-server
+          cargo build --manifest-path rust/Cargo.toml --release --bin bgp-api
+          ./rust/target/release/bgp-api
       - name: Build immutable SQLite database
         if: matrix.format == 'sqlite'
         env:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          go build -trimpath -o build-sqlite-dataset ./cmd/build-sqlite-dataset
-          go build -trimpath -o build-prefix-index ./cmd/build-prefix-index
-          go build -trimpath -o build-range-summaries ./cmd/build-range-summaries
-          go build -trimpath -o validate-database ./cmd/validate-database
-          ./build-sqlite-dataset \
+          cargo build --manifest-path rust/Cargo.toml --release \
+            --bin build-sqlite-dataset \
+            --bin build-prefix-index \
+            --bin build-range-summaries \
+            --bin validate-database
+          ./rust/target/release/build-sqlite-dataset \
             -input final_data \
             -output mehrnet_bgp.db \
             -release-tag "$RELEASE_TAG" \
             -built-at "$DATASET_BUILT_AT" \
             -source-commit "$GITHUB_SHA"
-          ./build-prefix-index mehrnet_bgp.db
-          ./build-range-summaries mehrnet_bgp.db
-          ./validate-database -indexed mehrnet_bgp.db
+          ./rust/target/release/build-prefix-index mehrnet_bgp.db
+          ./rust/target/release/build-range-summaries mehrnet_bgp.db
+          ./rust/target/release/validate-database -indexed mehrnet_bgp.db
           test -s mehrnet_bgp.db
       - name: Compress and upload database
         env:
@@ -230,9 +234,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.25"
+          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: data-*
@@ -245,9 +250,9 @@ jobs:
       - name: Build and test country database
         run: |
           cat artifacts/allocations_*.csv > final_data/allocations.csv
-          go test ./internal/countrydb
-          go build -trimpath -o build-country-db ./cmd/build-country-db
-          ./build-country-db -input final_data -output country.mncc
+          cargo test --manifest-path rust/Cargo.toml -p bgp-compact
+          cargo build --manifest-path rust/Cargo.toml --release --bin build-country-db
+          ./rust/target/release/build-country-db -input final_data -output country.mncc
           test -s country.mncc
       - name: Upload country database
         env:
@@ -269,9 +274,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          go-version: "1.25"
+          workspaces: "rust -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -293,10 +299,10 @@ jobs:
           cat artifacts/routes_*.csv > final_data/routes.csv
           cat artifacts/autnums_*.csv > final_data/autnums.csv
           test -s final_data/geolocations.csv
-          go test ./internal/litedb
+          cargo test --manifest-path rust/Cargo.toml -p bgp-compact
           npm --prefix workers/bgp-lite test
-          go build -trimpath -o build-lite-db ./cmd/build-lite-db
-          ./build-lite-db \
+          cargo build --manifest-path rust/Cargo.toml --release --bin build-lite-db
+          ./rust/target/release/build-lite-db \
             -input final_data \
             -output workers/bgp-lite/bgp-lite.mnl \
             -release-tag "$RELEASE_TAG" \

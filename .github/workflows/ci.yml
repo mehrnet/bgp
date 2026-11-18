@@ -13,11 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.25"
+          components: rustfmt, clippy
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - run: go test ./...
+      - run: ./scripts/check-quality.sh
+        working-directory: rust
       - run: npm --prefix workers/bgp-lite test

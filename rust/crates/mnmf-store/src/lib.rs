@@ -1,11 +1,19 @@
+pub mod builder;
+pub(crate) mod builder_indexes;
+pub(crate) mod builder_meta;
+pub(crate) mod builder_tables;
 pub mod codec;
+pub mod encode;
 pub mod format;
 pub mod index;
 pub mod lpm;
+pub mod lpm_build;
 pub mod queries;
 pub mod range_index;
 pub mod records;
 pub mod route_lpm;
+pub mod route_lpm_build;
+pub mod summary_build;
 pub mod types;
 
 use std::fs::File;

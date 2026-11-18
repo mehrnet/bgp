@@ -146,6 +146,6 @@ pub(crate) fn parse_asn_query(input: &str) -> Result<u32, ApiError> {
         .filter(|&n| n > 0)
         .ok_or_else(|| ApiError::BadRequest {
             code: "INVALID_ASN",
-            message: "query must be a valid AS number like AS13335 or 13335".into(),
+            message: "ASN must be a positive AS number, with or without the AS prefix".into(),
         })
 }

@@ -130,7 +130,12 @@ async fn handle_prefix(state: &ApiState, q: &HashMap<String, String>) -> Result<
         .acquire()
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    let body = encode_json(&lookup_prefix(&state.db, &prefix, page)?)?;
+    let body = encode_json(&lookup_prefix(&state.db, &prefix, page).map_err(|e| {
+        too_broad_msg(
+            e,
+            "prefix matches too many source records; request a narrower prefix",
+        )
+    })?)?;
     state.caches.resource.insert(key, body.clone());
     Ok(body)
 }
@@ -169,7 +174,12 @@ async fn handle_range(state: &ApiState, q: &HashMap<String, String>) -> Result<B
             .acquire()
             .await
             .map_err(|e| ApiError::Internal(e.to_string()))?;
-        lookup_range(&state.db, &range, kind, &page)?
+        lookup_range(&state.db, &range, kind, &page).map_err(|e| {
+            too_broad_msg(
+                e,
+                "range matches too many source records; use a canonical IPv4 CIDR from /0 through /16 for a generated summary, or request a narrower range",
+            )
+        })?
     };
     let body = encode_json(&resp)?;
     state.caches.resource.insert(key, body.clone());
@@ -197,6 +207,13 @@ fn handle_asn(state: &ApiState, q: &HashMap<String, String>) -> Result<Bytes, Ap
     let body = encode_json(&resp)?;
     state.caches.resource.insert(key, body.clone());
     Ok(body)
+}
+
+fn too_broad_msg(err: ApiError, msg: &str) -> ApiError {
+    match err {
+        ApiError::TooBroad(_) => ApiError::TooBroad(msg.to_owned()),
+        other => other,
+    }
 }
 
 fn encode_json<T: Serialize>(value: &T) -> Result<Bytes, ApiError> {

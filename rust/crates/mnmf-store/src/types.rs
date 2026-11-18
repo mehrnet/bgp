@@ -1,7 +1,7 @@
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub const SCHEMA_VERSION: u32 = 1;
 pub const FORMAT_VERSION: u32 = 1;
@@ -160,7 +160,7 @@ pub struct RangeSummary {
     pub asns: Vec<Facet>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Metadata {
     pub schema_version: u32,
     #[serde(default)]
