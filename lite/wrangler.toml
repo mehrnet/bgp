@@ -1,7 +1,6 @@
 name = "bgp-lite"
 main = "src/worker.js"
 compatibility_date = "2026-11-01"
-account_id = "94eee55a09ab74b34c825f704aa6b4cf"
 workers_dev = false
 
 routes = [
