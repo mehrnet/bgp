@@ -380,12 +380,9 @@ export class LiteDB {
     return this.decodeAutnumFrom(bytes, off, end, asn, summaryOnly);
   }
 
-  resolveASNSet(val, summaryOnly = false) {
+  resolveASNIndices(val) {
     if (val === 0) return [];
-    if (val <= this.asnCount) {
-      if (!this.autnumChunks) return [this.autnumByIdxSync(val, summaryOnly)];
-      return this.autnumByIdx(val, summaryOnly).then((r) => [r]);
-    }
+    if (val <= this.asnCount) return [val];
     const mIdx = val - this.asnCount - 1;
     if (mIdx < 0 || mIdx >= this.multiCount) return [];
     const off = this.multiDataOff + this.view.getUint32(this.multiOffsetsOff + mIdx * 4, true);
@@ -400,6 +397,13 @@ export class LiteDB {
       indices[i] = v;
       p = _uvNext;
     }
+    return indices;
+  }
+
+  resolveASNSet(val, summaryOnly = false) {
+    const indices = this.resolveASNIndices(val);
+    const count = indices.length;
+    if (count === 0) return [];
     if (!this.autnumChunks) {
       const out = new Array(count);
       for (let i = 0; i < count; i++) {
@@ -435,31 +439,41 @@ export class LiteDB {
         ? table.dataOff + this.view.getUint32(table.indexOff + (b + 1) * table.stride + table.kb, true)
         : table.dataOff + table.dataLen;
 
+    const shift = table.shift;
+    const shiftMul = shift === 0 ? 1 : 1 << shift;
     let prevStart = 0;
     let prevPStart = 0;
     let prevPEnd = 0;
     let found = false;
     while (off < end) {
-      let enc = 0;
-      let mul = 1;
-      let pStart = off;
-      let ok = false;
-      for (let i = 0; pStart < end && i < 10; i++) {
-        const byte = this.bytes[pStart++];
-        if (byte < 0x80) {
-          enc += byte * mul;
-          ok = true;
-          break;
+      const b0 = this.bytes[off];
+      let enc;
+      let pStart;
+      if (b0 < 0x80) {
+        enc = b0;
+        pStart = off + 1;
+      } else {
+        enc = 0;
+        let mul = 1;
+        pStart = off;
+        let ok = false;
+        for (let i = 0; pStart < end && i < 10; i++) {
+          const byte = this.bytes[pStart++];
+          if (byte < 0x80) {
+            enc += byte * mul;
+            ok = true;
+            break;
+          }
+          enc += (byte & 0x7f) * mul;
+          mul *= 128;
         }
-        enc += (byte & 0x7f) * mul;
-        mul *= 128;
+        if (!ok) return null;
       }
-      if (!ok) return null;
       const delta =
-        table.shift === 0
+        shift === 0
           ? enc
           : enc % 2 === 0
-            ? Math.floor(enc / 2) * (1 << table.shift)
+            ? Math.floor(enc / 2) * shiftMul
             : Math.floor(enc / 2);
       curKey += delta;
       const nextOff = skipPayload(this.bytes, pStart, end);
@@ -727,7 +741,7 @@ export class LiteDB {
     return lo;
   }
 
-  async lookupASN(asNumber, offset, limit) {
+  async lookupASN(asNumber, offset, limit, needTotal = true) {
     const idx = this.findASNIndex(asNumber);
     if (idx < 0) return null;
     const rec = await this.autnumByIdx(idx + 1);
@@ -745,6 +759,7 @@ export class LiteDB {
       let p = entry.off;
       const end = entry.end;
       const asnStr = `AS${asNumber}`;
+      const stopAt = offset + limit;
       while (p < end) {
         const rawLen = rBytes[p++];
         const isV6 = rawLen >= 128;
@@ -781,6 +796,7 @@ export class LiteDB {
         }
         p += nb;
         totalItems++;
+        if (!needTotal && totalItems > stopAt) break;
       }
     }
 
@@ -862,6 +878,7 @@ export class LiteDB {
     // Collect distinct route CIDRs covering [start, end] from the flattened LPM table.
     const routes = [];
     const seen = new Set();
+    const autnumCache = new Map();
     let matched = 0;
     let scanned = 0;
     let nextCursor = null;
@@ -871,7 +888,8 @@ export class LiteDB {
       const endNum = parsedPrefix.end >>> 0;
       let b = this.findBlock4(routeTable, startNum);
       if (b < 0) b = 0;
-      const shiftMul = 1 << routeTable.shift;
+      const shift = routeTable.shift;
+      const shiftMul = shift === 0 ? 1 : 1 << shift;
       outer4: for (; b < routeTable.blocks; b++) {
         let curKey = getKeyNum(this.bytes, routeTable.indexOff + b * routeTable.stride, routeTable.kb);
         let off =
@@ -885,11 +903,19 @@ export class LiteDB {
 
         while (off < end) {
           if (++scanned > 20000) return { tooBroad: true };
-          const enc = readUv(this.bytes, off, end);
-          if (enc < 0) break outer4;
-          const pStart = _uvNext;
+          const b0 = this.bytes[off];
+          let enc;
+          let pStart;
+          if (b0 < 0x80) {
+            enc = b0;
+            pStart = off + 1;
+          } else {
+            enc = readUv(this.bytes, off, end);
+            if (enc < 0) break outer4;
+            pStart = _uvNext;
+          }
           const delta =
-            routeTable.shift === 0
+            shift === 0
               ? enc
               : enc % 2 === 0
                 ? Math.floor(enc / 2) * shiftMul
@@ -905,16 +931,21 @@ export class LiteDB {
             if (rawRouteVal !== 0) {
               const masked = maskIPv4Range(curKey >>> 0, bits);
               if (masked.end >= startNum && masked.start <= endNum) {
-                const resolved = this.resolveASNSet(rawRouteVal, false);
-                const asns = this.autnumChunks ? await resolved : resolved;
-                for (const a of asns) {
-                  const key = `${masked.cidr}|${a.asNumber}`;
+                const indices = this.resolveASNIndices(rawRouteVal);
+                for (const idx of indices) {
+                  const asNumber = this.view.getUint32(this.asnNumbersOff + (idx - 1) * 4, true);
+                  const key = `${masked.cidr}|${asNumber}`;
                   if (seen.has(key)) continue;
                   seen.add(key);
                   if (matched >= cursorOffset) {
                     if (routes.length >= limit) {
                       nextCursor = String(matched);
                       break outer4;
+                    }
+                    let a = autnumCache.get(idx);
+                    if (!a) {
+                      a = this.autnumChunks ? await this.autnumByIdx(idx, false) : this.autnumByIdxSync(idx, false);
+                      autnumCache.set(idx, a);
                     }
                     const relation =
                       bits === parsedPrefix.bits
@@ -925,8 +956,8 @@ export class LiteDB {
                     routes.push({
                       prefix: masked.cidr,
                       version: 4,
-                      origin_asn: `AS${a.asNumber}`,
-                      as_number: a.asNumber,
+                      origin_asn: `AS${asNumber}`,
+                      as_number: asNumber,
                       relation,
                       registry: a.hasAutnum ? a.registry : null,
                       source: a.hasAutnum ? a.source : null,
@@ -982,16 +1013,21 @@ export class LiteDB {
             const masked = maskIPv6Range(curKey << 64n, bits);
             // Only emit if masked range overlaps [parsedPrefix.start, parsedPrefix.end].
             if (masked.end >= parsedPrefix.start && masked.start <= parsedPrefix.end) {
-              const resolved = this.resolveASNSet(rawRouteVal, false);
-              const asns = this.autnumChunks ? await resolved : resolved;
-              for (const a of asns) {
-                const key = `${masked.cidr}|${a.asNumber}`;
+              const indices = this.resolveASNIndices(rawRouteVal);
+              for (const idx of indices) {
+                const asNumber = this.view.getUint32(this.asnNumbersOff + (idx - 1) * 4, true);
+                const key = `${masked.cidr}|${asNumber}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
                 if (matched >= cursorOffset) {
                   if (routes.length >= limit) {
                     nextCursor = String(matched);
                     break outer;
+                  }
+                  let a = autnumCache.get(idx);
+                  if (!a) {
+                    a = this.autnumChunks ? await this.autnumByIdx(idx, false) : this.autnumByIdxSync(idx, false);
+                    autnumCache.set(idx, a);
                   }
                   const relation =
                     bits === parsedPrefix.bits
@@ -1002,8 +1038,8 @@ export class LiteDB {
                   routes.push({
                     prefix: masked.cidr,
                     version: 6,
-                    origin_asn: `AS${a.asNumber}`,
-                    as_number: a.asNumber,
+                    origin_asn: `AS${asNumber}`,
+                    as_number: asNumber,
                     relation,
                     registry: a.hasAutnum ? a.registry : null,
                     source: a.hasAutnum ? a.source : null,
