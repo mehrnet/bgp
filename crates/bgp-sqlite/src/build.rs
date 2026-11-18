@@ -2,6 +2,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use bgp_compact::city_coords::{CityCoordIndex, parse_coord_str};
+
 use rusqlite::types::Value;
 use rusqlite::{Connection, params};
 
@@ -94,17 +96,19 @@ pub fn build_sqlite_dataset(
         conn.execute_batch(spec.create_sql)
             .map_err(|e| format!("create {}: {e}", spec.name))?;
         let is_geo = spec.name == "geolocations";
+        let fb = input_dir.join("geolocations_fallback.csv");
+        let city_coords = is_geo
+            .then(|| CityCoordIndex::from_fallback_csv_if_exists(&fb))
+            .transpose()?;
         let mut count = import_csv(
             &mut conn,
             &input_dir.join(spec.file),
             spec,
             is_geo.then_some(0),
+            city_coords.as_ref(),
         )?;
-        if is_geo {
-            let fb = input_dir.join("geolocations_fallback.csv");
-            if fb.is_file() {
-                count += import_csv(&mut conn, &fb, spec, Some(1))?;
-            }
+        if is_geo && fb.is_file() {
+            count += import_csv(&mut conn, &fb, spec, Some(1), None)?;
         }
         println!("{}: {} rows", spec.name, count);
     }
@@ -145,6 +149,7 @@ fn import_csv(
     path: &Path,
     spec: &TableSpec<'_>,
     geo_fallback: Option<i64>,
+    city_coords: Option<&CityCoordIndex>,
 ) -> Result<usize, String> {
     let file = File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     let mut rdr = csv::ReaderBuilder::new()
@@ -161,7 +166,7 @@ fn import_csv(
         if !valid_row(&rec, spec.required) {
             continue;
         }
-        batch.push(row_values(&rec, spec.fields, geo_fallback));
+        batch.push(row_values(&rec, spec.fields, geo_fallback, city_coords));
         count += 1;
         if batch.len() >= BATCH_SIZE {
             flush_batch(conn, spec.insert_sql, &mut batch)?;
@@ -204,23 +209,35 @@ fn valid_row(rec: &csv::ByteRecord, required: &[usize]) -> bool {
     })
 }
 
-fn row_values(rec: &csv::ByteRecord, fields: usize, geo_fallback: Option<i64>) -> Vec<Value> {
+fn field_text(rec: &csv::ByteRecord, idx: usize) -> String {
+    rec.get(idx)
+        .map(|b| String::from_utf8_lossy(b).trim().to_owned())
+        .unwrap_or_default()
+}
+
+fn row_values(
+    rec: &csv::ByteRecord,
+    fields: usize,
+    geo_fallback: Option<i64>,
+    city_coords: Option<&CityCoordIndex>,
+) -> Vec<Value> {
+    let coords = geo_fallback.map(|_| {
+        let (lat, lon) = (
+            parse_coord_str(&field_text(rec, 6)),
+            parse_coord_str(&field_text(rec, 7)),
+        );
+        city_coords.map_or((lat, lon), |idx| {
+            idx.resolve(lat, lon, &field_text(rec, 3), &field_text(rec, 5))
+        })
+    });
     let mut vals: Vec<Value> = (0..fields)
-        .map(|i| {
-            let Some(b) = rec.get(i) else {
-                return Value::Null;
-            };
-            let s = String::from_utf8_lossy(b).trim().to_owned();
-            if s.is_empty() {
-                Value::Null
-            } else if geo_fallback.is_some() && (i == 6 || i == 7) {
-                s.parse::<f64>()
-                    .ok()
-                    .filter(|v| v.is_finite())
-                    .map_or(Value::Null, Value::Real)
-            } else {
-                Value::Text(s)
-            }
+        .map(|i| match (coords, i) {
+            (Some((lat, _)), 6) => lat.map_or(Value::Null, Value::Real),
+            (Some((_, lon)), 7) => lon.map_or(Value::Null, Value::Real),
+            _ => match field_text(rec, i) {
+                s if s.is_empty() => Value::Null,
+                s => Value::Text(s),
+            },
         })
         .collect();
     if let Some(fb) = geo_fallback {

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use bgp_compact::city_coords::{CityCoordIndex, parse_coord_str};
 use bgp_compact::sortkey::parse_asn;
 
 use crate::builder::{BuildStats, MmapWriter};
@@ -21,6 +22,9 @@ pub(crate) fn build_geofeeds(
     let mut rfc_idx = RangePrefixPair::default();
     let mut fb_idx = RangePrefixPair::default();
 
+    let fallback_path = input_dir.join("geolocations_fallback.csv");
+    let city_coords = CityCoordIndex::from_fallback_csv_if_exists(&fallback_path)?;
+
     let ctx_primary = GeoWriteCtx {
         w,
         pool,
@@ -29,10 +33,10 @@ pub(crate) fn build_geofeeds(
         idx: &mut rfc_idx,
         buf: &mut buf,
         data_pos: &mut data_pos,
+        city_coords: Some(&city_coords),
     };
     load_geofeed_file(&input_dir.join("geolocations.csv"), false, ctx_primary)?;
 
-    let fallback_path = input_dir.join("geolocations_fallback.csv");
     if fallback_path.is_file() {
         let ctx_fb = GeoWriteCtx {
             w,
@@ -42,6 +46,7 @@ pub(crate) fn build_geofeeds(
             idx: &mut fb_idx,
             buf: &mut buf,
             data_pos: &mut data_pos,
+            city_coords: None,
         };
         load_geofeed_file(&fallback_path, true, ctx_fb)?;
     }
@@ -59,6 +64,7 @@ struct GeoWriteCtx<'a> {
     idx: &'a mut RangePrefixPair,
     buf: &'a mut Vec<u8>,
     data_pos: &'a mut u64,
+    city_coords: Option<&'a CityCoordIndex>,
 }
 
 fn load_geofeed_file(path: &Path, is_fallback: bool, c: GeoWriteCtx<'_>) -> Result<(), String> {
@@ -67,15 +73,23 @@ fn load_geofeed_file(path: &Path, is_fallback: bool, c: GeoWriteCtx<'_>) -> Resu
             return Ok(());
         };
         let id = next_id(c.stats.geofeeds)?;
+        let (country, city) = (field(row, 3), field(row, 5));
+        let (raw_lat, raw_lon) = (
+            parse_coord_str(&field(row, 6)),
+            parse_coord_str(&field(row, 7)),
+        );
+        let (latitude, longitude) = c.city_coords.map_or((raw_lat, raw_lon), |idx| {
+            idx.resolve(raw_lat, raw_lon, &country, &city)
+        });
         let rec = Geofeed {
             version: ver,
             start: s,
             end: e,
-            country: field(row, 3),
+            country,
             region: field(row, 4),
-            city: field(row, 5),
-            latitude: parse_coord(row, 6),
-            longitude: parse_coord(row, 7),
+            city,
+            latitude,
+            longitude,
             is_fallback,
         };
         c.buf.clear();
@@ -87,13 +101,6 @@ fn load_geofeed_file(path: &Path, is_fallback: bool, c: GeoWriteCtx<'_>) -> Resu
         c.stats.geofeeds = u64::from(id);
         Ok(())
     })
-}
-
-fn parse_coord(row: &csv::ByteRecord, idx: usize) -> Option<f64> {
-    field(row, idx)
-        .parse::<f64>()
-        .ok()
-        .filter(|v| v.is_finite())
 }
 
 pub(crate) fn build_autnums(

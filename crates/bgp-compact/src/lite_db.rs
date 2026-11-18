@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::Write;
 use std::net::IpAddr;
 
+use crate::city_coords::backfill_geo_coords;
 use crate::freq_dict::FreqDict;
 use crate::lite_encode::encode_mnl1;
 use crate::lite_routes::{CompactDicts, build_route_segments, remap_allocs, remap_geos};
@@ -196,6 +197,12 @@ impl LiteDbBuilder {
     }
 
     pub fn encode(mut self, w: &mut impl Write) -> Result<LiteStats, String> {
+        backfill_geo_coords(
+            &mut self.geo_loc_list,
+            &self.geo_loc_freq,
+            &self.countries,
+            &self.cities,
+        );
         let dicts = CompactDicts::from_builder(&self);
         remap_allocs(&mut self.alloc_v4, &dicts);
         remap_allocs(&mut self.alloc_v6, &dicts);

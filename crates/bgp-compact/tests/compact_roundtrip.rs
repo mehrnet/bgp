@@ -150,3 +150,29 @@ fn lite_db_rfc8805_overrides_narrower_fallback() -> Result<(), Box<dyn std::erro
     assert_eq!(stats.geo_locations, 2);
     Ok(())
 }
+
+#[test]
+fn city_coord_index_matches_country_and_city_case_insensitively()
+-> Result<(), Box<dyn std::error::Error>> {
+    use bgp_compact::city_coords::CityCoordIndex;
+    let dir = std::env::temp_dir().join("bgp-city-coords-unit");
+    std::fs::create_dir_all(&dir)?;
+    let csv_path = dir.join("fallback.csv");
+    std::fs::write(
+        &csv_path,
+        "1,2,4,DE,Hesse,Eschborn,50.1501,8.58033\n3,4,4,DE,Hesse,Eschborn,50.1501,8.58033\n5,6,4,DE,Hesse,Eschborn,50.9,8.9\n",
+    )?;
+    let idx = CityCoordIndex::from_fallback_csv(&csv_path)?;
+    assert_eq!(idx.lookup("de", "  eschborn "), Some((50.1501, 8.58033)));
+    assert_eq!(idx.lookup("US", "Eschborn"), None);
+    assert_eq!(
+        idx.resolve(Some(1.0), Some(2.0), "de", "eschborn"),
+        (Some(1.0), Some(2.0))
+    );
+    assert_eq!(
+        idx.resolve(None, None, "de", "eschborn"),
+        (Some(50.1501), Some(8.58033))
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}

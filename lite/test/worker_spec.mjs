@@ -63,6 +63,8 @@ function buildFixtureDB() {
       path.join(tmp, "geolocations.csv"),
       [
         `${padV4("1.1.1.0")},${padV4("1.1.1.255")},4,US,US-CA,Los Angeles`,
+        `${padV4("2.0.2.0")},${padV4("2.0.2.255")},4,DE,DE-HE,Eschborn`,
+        `${padV4("2.0.3.0")},${padV4("2.0.3.255")},4,US,TX,Eschborn`,
         `${padV6(v6SubStart)},${padV6(v6SubEnd)},6,GB,GB-ENG,London`,
       ].join("\n") + "\n"
     );
@@ -71,6 +73,7 @@ function buildFixtureDB() {
       [
         `${padV4("1.1.1.128")},${padV4("1.1.1.255")},4,DE,Berlin,Berlin,52.52,13.405`,
         `${padV4("2.0.1.0")},${padV4("2.0.1.255")},4,IR,Tehran,Tehran (District 7),35.7425,51.4402`,
+        `${padV4("2.0.4.0")},${padV4("2.0.4.255")},4,DE,Hesse,eschborn,50.1501,8.58033`,
       ].join("\n") + "\n"
     );
     fs.writeFileSync(
@@ -188,6 +191,20 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b3.location.city, "Tehran (District 7)");
   assert.equal(b3.location.latitude, 35.7425);
   assert.equal(b3.location.longitude, 51.4402);
+
+  // RFC 8805 backfill by (country, city), ignoring country mismatch
+  const rBackfill = (await call("/v1/ip?query=2.0.2.42")).json();
+  assert.equal(rBackfill.location.country_code, "DE");
+  assert.equal(rBackfill.location.region, "DE-HE");
+  assert.equal(rBackfill.location.city, "Eschborn");
+  assert.equal(rBackfill.location.latitude, 50.1501);
+  assert.equal(rBackfill.location.longitude, 8.58033);
+
+  const rNoMix = (await call("/v1/ip?query=2.0.3.42")).json();
+  assert.equal(rNoMix.location.country_code, "US");
+  assert.equal(rNoMix.location.city, "Eschborn");
+  assert.equal(rNoMix.location.latitude, null);
+  assert.equal(rNoMix.location.longitude, null);
 
   // IPv6
   const r6 = await call("/v1/ip?query=2606:4700:4700::1");

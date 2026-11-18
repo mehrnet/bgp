@@ -54,6 +54,11 @@ impl FreqDict {
     }
 
     #[must_use]
+    pub fn get(&self, id: u32) -> &str {
+        self.items.get(id as usize).map_or("", String::as_str)
+    }
+
+    #[must_use]
     pub fn compact_order(&self) -> (Vec<String>, Vec<u32>) {
         let n = self.items.len().saturating_sub(1);
         let mut order: Vec<u32> = (1..=n as u32).collect();
