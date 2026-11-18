@@ -23,6 +23,7 @@ case "$origin_slot" in
   secondary) origin_port=3103; origin_env=/etc/bgp-api/bgp-api-secondary.env ;;
   *) printf 'invalid active slot: %s\n' "$origin_slot" >&2; exit 1 ;;
 esac
+# shellcheck disable=SC2029
 origin_token="$(ssh "$ORIGIN_HOST" "sed -n 's/^ORIGIN_AUTH_TOKEN=//p' '$origin_env' | head -n1")"
 if [ -z "$origin_token" ]; then
   printf 'could not read the origin authorization token\n' >&2
@@ -35,10 +36,13 @@ scp -q "$BENCHMARK_BINARY" "$ORIGIN_HOST:/tmp/bgp-api-benchmark/benchmark"
 scp -q "$BENCHMARK_BINARY" "$EXTERNAL_HOST:/tmp/bgp-api-benchmark/benchmark"
 
 printf '\n== loopback origin (private HTTP) ==\n'
+# shellcheck disable=SC2029
 ssh "$ORIGIN_HOST" "/tmp/bgp-api-benchmark/benchmark -url 'http://127.0.0.1:${origin_port}/v1/ip?query=${BENCH_QUERY}' -requests '$REQUESTS' -concurrency '$CONCURRENCY' -warmup '$WARMUP' -header 'X-BGP-API-Origin-Token: $origin_token'"
 
 printf '\n== external client (direct-origin HTTPS) ==\n'
+# shellcheck disable=SC2029
 ssh "$EXTERNAL_HOST" "/tmp/bgp-api-benchmark/benchmark -url '$PUBLIC_URL' -connect-ip '$ORIGIN_IP' -requests '$REQUESTS' -concurrency '$CONCURRENCY' -warmup '$WARMUP'"
 
 printf '\n== external client (public HTTPS through Cloudflare) ==\n'
+# shellcheck disable=SC2029
 ssh "$EXTERNAL_HOST" "/tmp/bgp-api-benchmark/benchmark -url '$PUBLIC_URL' -requests '$REQUESTS' -concurrency '$CONCURRENCY' -warmup '$WARMUP'"

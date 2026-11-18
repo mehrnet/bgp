@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+      - name: Lint shell scripts
+        run: shellcheck install.sh scripts/*.sh
       - name: Run Rust quality gate (line limits, fmt, clippy, unit tests)
         run: ./scripts/check-quality.sh
       - name: Run bgp-lite worker tests

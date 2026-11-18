@@ -9,11 +9,13 @@ readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp-api}"
 readonly DATA_DIR="${BGP_API_DATA_DIR:-/var/lib/bgp-api}"
 readonly PRIMARY_DATABASE_PATH="${BGP_API_PRIMARY_DATABASE_PATH:-${BGP_API_DATABASE_PATH:-$DATA_DIR/primary.mmap}}"
 readonly SECONDARY_DATABASE_PATH="${BGP_API_SECONDARY_DATABASE_PATH:-$DATA_DIR/secondary.mmap}"
-readonly LEGACY_DATABASE_PATH="$DATA_DIR/mehrnet_bgp.mmap"
 readonly BINARY_PATH="${BGP_API_BINARY_PATH:-/usr/local/bin/bgp-api}"
 readonly RELEASE_FILE="${BGP_API_RELEASE_FILE:-$DATA_DIR/release-tag}"
 readonly PUBLISHED_FILE="${BGP_API_PUBLISHED_FILE:-$DATA_DIR/release-published-at}"
+readonly BINARY_STAMP_FILE="${BGP_API_BINARY_STAMP_FILE:-$DATA_DIR/binary-release}"
+readonly DATABASE_STAMP_FILE="${BGP_API_DATABASE_STAMP_FILE:-$DATA_DIR/database-release}"
 readonly ACTIVE_SLOT_FILE="${BGP_API_ACTIVE_SLOT_FILE:-$DATA_DIR/active-slot}"
+readonly STAGE_DROPIN_DIR="${BGP_API_STAGE_DROPIN_DIR:-/run/systemd/system}"
 readonly SERVICE="${BGP_API_SERVICE:-bgp-api.service}"
 readonly SECONDARY_SERVICE="${BGP_API_SECONDARY_SERVICE:-bgp-api-secondary.service}"
 readonly PRIMARY_ENV_FILE="${BGP_API_PRIMARY_ENV_FILE:-/etc/bgp-api/bgp-api.env}"
@@ -57,8 +59,13 @@ flock -n 9 || { say "another sync is already running"; exit 0; }
 started_at="$(date +%s)"
 sync_tmp_root="${BGP_API_SYNC_TMPDIR:-${TMPDIR:-/tmp}}"
 work_dir="$(mktemp -d "$sync_tmp_root/bgp-api-sync.XXXXXX")"
-trap 'rm -rf -- "$work_dir"' EXIT
 active_caches_released=false
+active_staging_dropin=""
+cleanup() {
+  clear_staging_dropin || true
+  rm -rf -- "$work_dir"
+}
+trap cleanup EXIT
 
 github_api() {
   local -a headers=(-H 'Accept: application/vnd.github+json')
@@ -80,6 +87,16 @@ download() {
 
 asset_url() {
   jq -er --arg name "$1" '.assets[] | select(.name == $name) | .browser_download_url' <<<"$release_json"
+}
+
+asset_stamp() {
+  jq -er --arg name "$1" '
+    .assets[] | select(.name == $name) | (.digest // "\(.id):\(.updated_at):\(.size)")
+  ' <<<"$release_json"
+}
+
+sha256_file() {
+  sha256sum "$1" | awk '{ print $1; exit }'
 }
 
 verify_asset() {
@@ -420,6 +437,75 @@ restore_binary() {
   fi
 }
 
+stage_dropin_dir() {
+  printf '%s/%s.d\n' "$STAGE_DROPIN_DIR" "$1"
+}
+
+write_staging_dropin() {
+  local service="$1" dir conf env_override
+  dir="$(stage_dropin_dir "$service")"
+  conf="$dir/99-bgp-api-staging.conf"
+  env_override="$dir/99-bgp-api-staging.env"
+  install -d -m 0755 "$dir"
+  cat > "$env_override" <<'EOF'
+BGP_API_DEFER_CACHE_WARMUP=0
+BGP_API_BLOCK_UNTIL_CACHE_WARMUP=1
+EOF
+  chmod 0644 "$env_override"
+  cat > "$conf" <<EOF
+[Service]
+EnvironmentFile=$env_override
+EOF
+  chmod 0644 "$conf"
+  active_staging_dropin="$dir"
+  systemctl daemon-reload
+}
+
+clear_staging_dropin() {
+  local service="${1:-}" dir=""
+  if [ -n "$service" ]; then
+    dir="$(stage_dropin_dir "$service")"
+  elif [ -n "${active_staging_dropin:-}" ]; then
+    dir="$active_staging_dropin"
+  fi
+  [ -n "$dir" ] || return 0
+  if [ -e "$dir/99-bgp-api-staging.conf" ] || [ -e "$dir/99-bgp-api-staging.env" ]; then
+    rm -rf -- "$dir"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+  if [ "$active_staging_dropin" = "$dir" ]; then
+    active_staging_dropin=""
+  fi
+}
+
+rollback_staged_slot() {
+  local stop_reason="$1" abort_reason="$2" disable_slot="${3:-false}"
+  clear_staging_dropin "$target_service"
+  restore_slot_priority "$target_service"
+  stop_service "$target_service"
+  if ! wait_stopped "$target_service"; then
+    restore_binary "$binary_backup"
+    restore_active_caches_after_failed_stage "$active_service"
+    die "$target_service did not stop $stop_reason"
+  fi
+  if [ "$disable_slot" = true ]; then
+    systemctl disable "$target_service" >/dev/null 2>&1 || true
+  fi
+  rm -f -- "$target_database"
+  restore_binary "$binary_backup"
+  restore_active_caches_after_failed_stage "$active_service"
+  die "$abort_reason"
+}
+
+write_release_stamps() {
+  printf '%s\n' "$release_tag" > "$RELEASE_FILE"
+  printf '%s\n' "$published_at" > "$PUBLISHED_FILE"
+  printf '%s\n' "$database_stamp" > "$DATABASE_STAMP_FILE"
+  printf '%s:%s\n' "$binary_stamp" "$(sha256_file "$BINARY_PATH")" > "$BINARY_STAMP_FILE"
+  chown bgpapi:bgpapi "$RELEASE_FILE" "$PUBLISHED_FILE" "$DATABASE_STAMP_FILE" "$BINARY_STAMP_FILE"
+  chmod 0640 "$RELEASE_FILE" "$PUBLISHED_FILE" "$DATABASE_STAMP_FILE" "$BINARY_STAMP_FILE"
+}
+
 case "$(uname -m)" in
   x86_64|amd64) arch=amd64 ;;
   aarch64|arm64) arch=arm64 ;;
@@ -434,13 +520,14 @@ published_epoch="$(date -u -d "$published_at" +%s)"
 now_epoch="$(date +%s)"
 [ "$published_epoch" -le "$((now_epoch + 300))" ] || die "latest release timestamp is in the future"
 
+database_asset=mehrnet_bgp_mmap.tar.zst
+binary_asset="bgp-api-linux-${arch}.tar.gz"
+database_stamp="$(asset_stamp "$database_asset")"
+binary_stamp="$(asset_stamp "$binary_asset")"
+
 installed_tag=""
 [ ! -f "$RELEASE_FILE" ] || installed_tag="$(tr -d '[:space:]' < "$RELEASE_FILE")"
-if [ "$installed_tag" = "$release_tag" ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
-  say "release $release_tag is already active"
-  exit 0
-fi
-if [ -s "$PUBLISHED_FILE" ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
+if [ "$installed_tag" != "$release_tag" ] && [ -s "$PUBLISHED_FILE" ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
   installed_published_at="$(tr -d '[:space:]' < "$PUBLISHED_FILE")"
   installed_published_epoch="$(date -u -d "$installed_published_at" +%s)"
   if [ "$published_epoch" -le "$installed_published_epoch" ]; then
@@ -449,24 +536,78 @@ if [ -s "$PUBLISHED_FILE" ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
   fi
 fi
 
-database_asset=mehrnet_bgp_mmap.tar.zst
-binary_asset="bgp-api-linux-${arch}.tar.gz"
-download "$(asset_url SHA256SUMS.txt)" "$work_dir/SHA256SUMS.txt"
-download "$(asset_url "$database_asset")" "$work_dir/$database_asset"
-download "$(asset_url "$binary_asset")" "$work_dir/$binary_asset"
-verify_asset "$database_asset"
-verify_asset "$binary_asset"
+installed_database_stamp=""
+[ ! -f "$DATABASE_STAMP_FILE" ] || installed_database_stamp="$(tr -d '[:space:]' < "$DATABASE_STAMP_FILE")"
+installed_binary_record=""
+[ ! -f "$BINARY_STAMP_FILE" ] || installed_binary_record="$(tr -d '[:space:]' < "$BINARY_STAMP_FILE")"
+current_binary_record=""
+if [ -x "$BINARY_PATH" ]; then
+  current_binary_record="${binary_stamp}:$(sha256_file "$BINARY_PATH")"
+fi
 
-say "extracting release $release_tag"
-mkdir "$work_dir/database" "$work_dir/binary"
-low_priority zstd --decompress --stdout "$work_dir/$database_asset" | \
-  low_priority tar -xf - -C "$work_dir/database"
+dataset_current=false
+if [ "$installed_tag" = "$release_tag" ] && { [ -z "$installed_database_stamp" ] || [ "$installed_database_stamp" = "$database_stamp" ]; }; then
+  dataset_current=true
+fi
+
+binary_current=false
+if [ -n "$current_binary_record" ] && [ "$installed_binary_record" = "$current_binary_record" ]; then
+  binary_current=true
+fi
+
+if [ "$dataset_current" = true ] && [ "$binary_current" = true ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
+  say "release $release_tag is already active"
+  exit 0
+fi
+
+download "$(asset_url SHA256SUMS.txt)" "$work_dir/SHA256SUMS.txt"
+download "$(asset_url "$binary_asset")" "$work_dir/$binary_asset"
+verify_asset "$binary_asset"
+mkdir "$work_dir/binary"
 low_priority tar -xzf "$work_dir/$binary_asset" -C "$work_dir/binary"
-new_database="$work_dir/database/mehrnet_bgp.mmap"
 new_binary="$work_dir/binary/bgp-api-linux-${arch}"
-[ -s "$new_database" ] || die "database archive did not contain mehrnet_bgp.mmap"
 [ -s "$new_binary" ] || die "binary archive did not contain bgp-api-linux-${arch}"
 chmod 0755 "$new_binary"
+
+if [ "$dataset_current" = true ] && [ "${BGP_API_FORCE_SYNC:-0}" != 1 ]; then
+  if [ -x "$BINARY_PATH" ] && [ "$(sha256_file "$new_binary")" = "$(sha256_file "$BINARY_PATH")" ]; then
+    write_release_stamps
+    say "release $release_tag is already active"
+    exit 0
+  fi
+  active_slot="$(read_active_slot)"
+  if [ "$active_slot" != none ]; then
+    active_service="$(service_for_slot "$active_slot")"
+    active_database="$(database_for_slot "$active_slot")"
+    active_port="$(port_for_slot "$active_slot")"
+    if service_active "$active_service" && [ -s "$active_database" ]; then
+      say "updating binary in active $active_service slot for release $release_tag"
+      binary_backup="$work_dir/bgp-api.previous"
+      [ ! -s "$BINARY_PATH" ] || cp "$BINARY_PATH" "$binary_backup"
+      install -o root -g root -m 0755 "$new_binary" "$BINARY_PATH"
+      if ! systemctl restart "$active_service" || ! health_check "$active_port"; then
+        restore_binary "$binary_backup"
+        systemctl restart "$active_service" >/dev/null 2>&1 || true
+        die "$active_service failed after binary update for release $release_tag"
+      fi
+      write_release_stamps
+      rm -f -- "$binary_backup"
+      elapsed="$(( $(date +%s) - started_at ))"
+      say "updated $BINARY_PATH for release $release_tag in ${elapsed}s"
+      exit 0
+    fi
+  fi
+fi
+
+download "$(asset_url "$database_asset")" "$work_dir/$database_asset"
+verify_asset "$database_asset"
+
+say "extracting release $release_tag"
+mkdir "$work_dir/database"
+low_priority zstd --decompress --stdout "$work_dir/$database_asset" | \
+  low_priority tar -xf - -C "$work_dir/database"
+new_database="$work_dir/database/mehrnet_bgp.mmap"
+[ -s "$new_database" ] || die "database archive did not contain mehrnet_bgp.mmap"
 
 say "validating downloaded database"
 BGP_API_DATABASE_PATH="$new_database" BGP_API_VALIDATE_ONLY=1 "$new_binary"
@@ -532,38 +673,23 @@ if [ "$blue_green" = true ]; then
   # The current mmap file stays valid, so it continues serving correct
   # responses until Caddy moves traffic to the staged slot.
   release_active_caches_before_stage "$active_service" "$(port_for_slot "$active_slot")"
-  # The old slot keeps serving while the replacement completes its expensive
-  # selector copy. systemd reads these values before exec, so restoring them
-  # after start affects only a later process restart.
-  deferred_cache_warmup_before="$(env_value BGP_API_DEFER_CACHE_WARMUP "$target_env_file")"
-  block_cache_warmup_before="$(env_value BGP_API_BLOCK_UNTIL_CACHE_WARMUP "$target_env_file")"
-  # Persist capability state for the slot that will become active. The next
-  # update can safely request SIGUSR2 only after it sees this process flag.
-  set_env_value BGP_API_RUNTIME_CACHE_CONTROL 1 "$target_env_file"
-  set_env_value BGP_API_DEFER_CACHE_WARMUP 0 "$target_env_file"
-  set_env_value BGP_API_BLOCK_UNTIL_CACHE_WARMUP 1 "$target_env_file"
+  # Persist capability state for the slot that will become active if missing.
+  # The next update can safely request SIGUSR2 only after seeing this flag.
+  if [ "$(env_value BGP_API_RUNTIME_CACHE_CONTROL "$target_env_file")" != 1 ]; then
+    set_env_value BGP_API_RUNTIME_CACHE_CONTROL 1 "$target_env_file"
+  fi
+  # Stage blocking cache warmup through a transient runtime drop-in so
+  # /etc/bgp-api/*.env stays untouched across blue-green deployments.
+  write_staging_dropin "$target_service"
   deprioritize_staged_slot "$target_service"
   if ! systemctl start "$target_service"; then
-    restore_slot_priority "$target_service"
-    set_env_value BGP_API_DEFER_CACHE_WARMUP "${deferred_cache_warmup_before:-0}" "$target_env_file"
-    set_env_value BGP_API_BLOCK_UNTIL_CACHE_WARMUP "${block_cache_warmup_before:-0}" "$target_env_file"
-    restore_active_caches_after_failed_stage "$active_service"
-    die "$target_service could not start"
+    rollback_staged_slot "after a failed start" "$target_service could not start"
   fi
-  set_env_value BGP_API_DEFER_CACHE_WARMUP "${deferred_cache_warmup_before:-0}" "$target_env_file"
-  set_env_value BGP_API_BLOCK_UNTIL_CACHE_WARMUP "${block_cache_warmup_before:-0}" "$target_env_file"
+  clear_staging_dropin "$target_service"
   if ! health_check "$target_port"; then
-    restore_slot_priority "$target_service"
-    stop_service "$target_service"
-    if ! wait_stopped "$target_service"; then
-      restore_binary "$binary_backup"
-      restore_active_caches_after_failed_stage "$active_service"
-      die "$target_service did not stop after a failed health check"
-    fi
-    rm -f -- "$target_database"
-    restore_binary "$binary_backup"
-    restore_active_caches_after_failed_stage "$active_service"
-    die "$target_service did not become healthy; active slot was left unchanged"
+    rollback_staged_slot \
+      "after a failed health check" \
+      "$target_service did not become healthy; active slot was left unchanged"
   fi
   staged_pid="$(service_main_pid "$target_service" 2>/dev/null || true)"
   staged_rss="${staged_pid:+$(process_rss_mib "$staged_pid" 2>/dev/null || true)}"
@@ -573,34 +699,19 @@ if [ "$blue_green" = true ]; then
 
   say "switching Caddy traffic to the prewarmed $target_service slot on 127.0.0.1:$target_port"
   if ! switch_caddy "$target_port" "$(port_for_slot "$active_slot")"; then
-    restore_slot_priority "$target_service"
-    stop_service "$target_service"
-    if ! wait_stopped "$target_service"; then
-      restore_binary "$binary_backup"
-      restore_active_caches_after_failed_stage "$active_service"
-      die "$target_service did not stop after Caddy rejected the new upstream"
-    fi
-    systemctl disable "$target_service" >/dev/null 2>&1 || true
-    rm -f -- "$target_database"
-    restore_binary "$binary_backup"
-    restore_active_caches_after_failed_stage "$active_service"
-    die "Caddy rejected the new upstream; active slot was left unchanged"
+    rollback_staged_slot \
+      "after Caddy rejected the new upstream" \
+      "Caddy rejected the new upstream; active slot was left unchanged" \
+      true
   fi
   if ! write_active_slot "$target_slot"; then
     if ! switch_caddy "$(port_for_slot "$active_slot")" "$target_port"; then
       die "could not persist the active slot or restore Caddy; the new slot remains serving"
     fi
-    stop_service "$target_service"
-    if ! wait_stopped "$target_service"; then
-      restore_binary "$binary_backup"
-      restore_active_caches_after_failed_stage "$active_service"
-      die "$target_service did not stop after the slot marker failed"
-    fi
-    systemctl disable "$target_service" >/dev/null 2>&1 || true
-    rm -f -- "$target_database"
-    restore_binary "$binary_backup"
-    restore_active_caches_after_failed_stage "$active_service"
-    die "could not persist the active slot; active slot was left unchanged"
+    rollback_staged_slot \
+      "after the slot marker failed" \
+      "could not persist the active slot; active slot was left unchanged" \
+      true
   fi
 
   # A Caddy reload is atomic for new connections, but existing HTTP/2 and
@@ -617,17 +728,10 @@ if [ "$blue_green" = true ]; then
       die "$active_service did not drain and Caddy could not restore the old upstream; the new slot remains serving"
     fi
     write_active_slot "$active_slot" || true
-    stop_service "$target_service"
-    if ! wait_stopped "$target_service"; then
-      restore_binary "$binary_backup"
-      restore_active_caches_after_failed_stage "$active_service"
-      die "$target_service did not stop after the drain failure"
-    fi
-    systemctl disable "$target_service" >/dev/null 2>&1 || true
-    rm -f -- "$target_database"
-    restore_binary "$binary_backup"
-    restore_active_caches_after_failed_stage "$active_service"
-    die "$active_service did not drain within 30 seconds; active slot was left unchanged"
+    rollback_staged_slot \
+      "after the drain failure" \
+      "$active_service did not drain within 30 seconds; active slot was left unchanged" \
+      true
   fi
   rm -f -- "$active_database"
   systemctl disable "$active_service" >/dev/null 2>&1 || true
@@ -639,7 +743,7 @@ else
   stop_service "$SECONDARY_SERVICE"
   wait_stopped "$SERVICE" || die "$SERVICE did not stop"
   wait_stopped "$SECONDARY_SERVICE" || die "$SECONDARY_SERVICE did not stop"
-  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH" "$LEGACY_DATABASE_PATH"
+  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH"
   mv "$new_database" "$PRIMARY_DATABASE_PATH"
   chown bgpapi:bgpapi "$PRIMARY_DATABASE_PATH"
   chmod 0440 "$PRIMARY_DATABASE_PATH"
@@ -663,10 +767,7 @@ else
   write_active_slot primary
 fi
 
-printf '%s\n' "$release_tag" > "$RELEASE_FILE"
-printf '%s\n' "$published_at" > "$PUBLISHED_FILE"
-chown bgpapi:bgpapi "$RELEASE_FILE" "$PUBLISHED_FILE"
-chmod 0640 "$RELEASE_FILE" "$PUBLISHED_FILE"
+write_release_stamps
 rm -f -- "$binary_backup"
 elapsed="$(( $(date +%s) - started_at ))"
 if [ "$blue_green" = true ]; then

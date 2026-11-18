@@ -74,7 +74,7 @@ while [ "$#" -gt 0 ]; do
       DOMAIN_SET=true
       shift 2
       ;;
-    --auto-update|--audo-update)
+    --auto-update)
       AUTO_UPDATE=true
       shift
       ;;
@@ -335,11 +335,8 @@ install -m 0644 "$work_dir/bgp-api.service" "$SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-secondary.service" "$SECONDARY_SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-sync.service" "$SYNC_SERVICE_FILE"
 
-# Stop both services before migrating from legacy paths or switching slot layout.
+# Stop both services before updating configuration or slot state.
 systemctl stop bgp-api.service bgp-api-secondary.service >/dev/null 2>&1 || true
-if [ -e "$DATA_DIR/mehrnet_bgp.mmap" ] && [ ! -e "$DATA_DIR/primary.mmap" ]; then
-  mv "$DATA_DIR/mehrnet_bgp.mmap" "$DATA_DIR/primary.mmap"
-fi
 
 origin_token=""
 if [ "$DOMAIN_SET" = true ]; then
@@ -354,7 +351,6 @@ cat > "$ENV_FILE" <<EOF
 BGP_API_DATABASE_PATH=$DATA_DIR/primary.mmap
 BGP_API_PRIMARY_DATABASE_PATH=$DATA_DIR/primary.mmap
 LISTEN_ADDR=127.0.0.1:3102
-GOMAXPROCS=2
 BGP_API_CACHE_STRATEGY=auto
 BGP_API_DEFER_CACHE_WARMUP=0
 BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
@@ -368,7 +364,6 @@ cat > "$SECONDARY_ENV_FILE" <<EOF
 BGP_API_DATABASE_PATH=$DATA_DIR/secondary.mmap
 BGP_API_SECONDARY_DATABASE_PATH=$DATA_DIR/secondary.mmap
 LISTEN_ADDR=127.0.0.1:3103
-GOMAXPROCS=2
 BGP_API_CACHE_STRATEGY=auto
 BGP_API_DEFER_CACHE_WARMUP=0
 BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
