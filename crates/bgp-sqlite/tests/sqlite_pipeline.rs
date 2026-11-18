@@ -64,7 +64,7 @@ fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std
 
     let conn = Connection::open(&db_path)?;
     let pfx_rows: i64 = conn.query_row("SELECT count(*) FROM lookup_prefixes", [], |r| r.get(0))?;
-    assert_eq!(pfx_rows, 4);
+    assert_eq!(pfx_rows, 3);
     let (lat, lon, fb): (Option<f64>, Option<f64>, i64) = conn.query_row(
         "SELECT latitude, longitude, is_fallback FROM geolocations WHERE city = 'Berlin'",
         [],

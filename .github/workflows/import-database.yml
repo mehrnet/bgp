@@ -221,7 +221,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
-          tar --create --file - "${{ matrix.database }}" | zstd --threads=0 -3 --stdout > "${{ matrix.asset }}"
+          tar --create --file - "${{ matrix.database }}" | zstd --threads=0 -9 --stdout > "${{ matrix.asset }}"
+          ls -lh "${{ matrix.database }}" "${{ matrix.asset }}"
           sha256sum "${{ matrix.asset }}" > "checksum-${{ matrix.format }}.txt"
           gh release upload "$RELEASE_TAG" "${{ matrix.asset }}" --clobber
       - uses: actions/upload-artifact@v6
