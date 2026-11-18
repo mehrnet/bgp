@@ -12,7 +12,9 @@ CONCURRENCY="${BGP_API_BENCH_CONCURRENCY:-32}"
 WARMUP="${BGP_API_BENCH_WARMUP:-200}"
 BENCHMARK_BINARY="${BGP_API_BENCHMARK_BINARY:-$PWD/bin/bgp-api-benchmark}"
 
-go build -trimpath -ldflags='-s -w' -o "$BENCHMARK_BINARY" ./cmd/benchmark-http
+mkdir -p "$(dirname "$BENCHMARK_BINARY")"
+cargo build --manifest-path rust/Cargo.toml --release --bin benchmark-http
+cp rust/target/release/benchmark-http "$BENCHMARK_BINARY"
 
 origin_slot="$(ssh "$ORIGIN_HOST" 'cat /var/lib/bgp-api/active-slot')"
 case "$origin_slot" in

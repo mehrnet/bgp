@@ -141,6 +141,8 @@ assert a1["routes"]["next_cursor"], "missing asn cursor"
 compare(f"/v1/asn?query=13335&limit=1&cursor={a1['routes']['next_cursor']}")
 compare("/v1/asn?query=AS13335&page=1&limit=1")
 compare("/v1/asn?query=AS64599")
+compare("/v1/asn?query=AS0")
+compare("/v1/asn?query=bad")
 compare("/v1/asn?query=13335&page=1&cursor=1")
 compare("/unknown")
 print("Go vs Rust differential parity OK (24 checks passed cleanly).")
