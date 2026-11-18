@@ -30,21 +30,13 @@ fn minimal_db() -> Result<Arc<Db>, Box<dyn std::error::Error>> {
         (Section::AllocLpmV6, 6u8, b"SLP2", 45usize),
         (Section::GeoLpmV4, 4u8, b"SLP2", 21usize),
         (Section::GeoLpmV6, 6u8, b"SLP2", 45usize),
+        (Section::GeoFallbackLpmV4, 4u8, b"SLP2", 21usize),
+        (Section::GeoFallbackLpmV6, 6u8, b"SLP2", 45usize),
         (Section::RouteLpmV4, 4u8, b"MLP2", 33usize),
         (Section::RouteLpmV6, 6u8, b"MLP2", 33usize),
     ] {
-        let mut buf = vec![0u8; 16 + ns];
-        if let Some(d) = buf.get_mut(0..4) {
-            d.copy_from_slice(m);
-        }
-        if let Some(d) = buf.get_mut(4) {
-            *d = v;
-        }
-        if let Some(d) = buf.get_mut(8..12) {
-            d.copy_from_slice(&1u32.to_be_bytes());
-        }
         if let Some(slot) = table.get_mut(s as usize) {
-            *slot = buf;
+            *slot = empty_lpm(m, v, ns);
         }
     }
     let mut out = vec![0u8; HEADER_SIZE];
@@ -60,6 +52,20 @@ fn minimal_db() -> Result<Arc<Db>, Box<dyn std::error::Error>> {
     }
     write_header(&mut out, &specs);
     Ok(Arc::new(Db::from_bytes(out)?))
+}
+
+fn empty_lpm(magic: &[u8; 4], version: u8, node_size: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; 16 + node_size];
+    if let Some(d) = buf.get_mut(0..4) {
+        d.copy_from_slice(magic);
+    }
+    if let Some(d) = buf.get_mut(4) {
+        *d = version;
+    }
+    if let Some(d) = buf.get_mut(8..12) {
+        d.copy_from_slice(&1u32.to_be_bytes());
+    }
+    buf
 }
 
 fn write_header(out: &mut [u8], specs: &[(u64, u64); SECTION_COUNT]) {

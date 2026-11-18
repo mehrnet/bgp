@@ -110,6 +110,16 @@ pub fn append_geofeed(dst: &mut Vec<u8>, pool: &mut StringPoolWriter, v: &Geofee
     pool.encode_pooled(dst, &v.country);
     pool.encode_pooled(dst, &v.region);
     pool.encode_pooled(dst, &v.city);
+    let flags = u8::from(v.latitude.is_some())
+        | (u8::from(v.longitude.is_some()) << 1)
+        | (u8::from(v.is_fallback) << 2);
+    dst.push(flags);
+    if let Some(lat) = v.latitude {
+        dst.extend_from_slice(&lat.to_be_bytes());
+    }
+    if let Some(lon) = v.longitude {
+        dst.extend_from_slice(&lon.to_be_bytes());
+    }
 }
 
 pub fn append_autnum(dst: &mut Vec<u8>, pool: &mut StringPoolWriter, v: &Autnum) {

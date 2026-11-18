@@ -121,11 +121,20 @@ jobs:
           touch artifacts/geofeeds_dummy.txt
           cat artifacts/geofeeds_*.txt | sort -u > final_data/geofeeds.txt
       - name: Fetch geofeeds
-        run: cargo run -p bgp-tools --release --bin fetch-geofeeds
+        run: |
+          cargo run -p bgp-tools --release --bin fetch-geofeeds
+          curl -fsSL --retry 3 "https://cdn.jsdelivr.net/npm/dbip-city-lite/dbip-city-lite.mmdb.gz" -o final_data/dbip-city-lite.mmdb.gz
+          test -s final_data/dbip-city-lite.mmdb.gz
+          cargo run -p bgp-tools --release --bin export-dbip-csv -- \
+            -dbip final_data/dbip-city-lite.mmdb.gz \
+            -output final_data/geolocations_fallback.csv
+          test -s final_data/geolocations_fallback.csv
       - uses: actions/upload-artifact@v6
         with:
           name: geofeed-locations
-          path: final_data/geolocations.csv
+          path: |
+            final_data/geolocations.csv
+            final_data/geolocations_fallback.csv
           compression-level: 1
           retention-days: 1
           if-no-files-found: error
@@ -426,7 +435,8 @@ jobs:
           - `mehrnet_bgp_mmap.tar.zst` contains the ready-to-query zero-copy mmap database. No import or index build is required on the API server.
           - `mehrnet_bgp_sqlite.tar.zst` contains the ready-to-query SQLite database for third-party users and offline inspection.
           - `country.mncc` is a tiny IP-to-country-code database (MNCC format) for bundling into clients; see `docs/country-database.md`.
-          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`lite/`). Fallback geolocation data includes IP Geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0).
+          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`lite/`).
+          - Fallback city/region geolocation (and coordinates in full datasets) includes IP Geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0).
           - `bgp-api-linux-amd64.tar.gz` and `bgp-api-linux-arm64.tar.gz` contain statically linked API binaries.
           - `SHA256SUMS.txt` verifies every downloadable payload.
           EOF

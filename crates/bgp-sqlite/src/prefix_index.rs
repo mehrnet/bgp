@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use bgp_compact::sortkey::range_to_prefixes;
+use rusqlite::types::Value;
 use rusqlite::{Connection, params};
 
 const BATCH_SIZE: i64 = 1000;
@@ -13,15 +14,15 @@ struct SourceDef {
 const SOURCES: &[SourceDef] = &[
     SourceDef {
         name: "allocation",
-        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, registry, country, netname, NULL, NULL, NULL, NULL, status, allocation_date, created, last_modified, source, mnt_by, org, abuse_contact, descr FROM allocations WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
+        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, registry, country, netname, NULL, NULL, NULL, NULL, status, allocation_date, created, last_modified, source, mnt_by, org, abuse_contact, descr, NULL, NULL, NULL FROM allocations WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
     },
     SourceDef {
         name: "route",
-        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, registry, NULL, NULL, cidr, asn, NULL, NULL, NULL, NULL, NULL, NULL, source, mnt_by, org, abuse_contact, descr FROM routes WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
+        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, registry, NULL, NULL, cidr, asn, NULL, NULL, NULL, NULL, NULL, NULL, source, mnt_by, org, abuse_contact, descr, NULL, NULL, NULL FROM routes WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
     },
     SourceDef {
         name: "geofeed",
-        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, NULL, country, NULL, NULL, NULL, region, city, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL FROM geolocations WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
+        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, NULL, country, NULL, NULL, NULL, region, city, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, latitude, longitude, is_fallback FROM geolocations WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
     },
 ];
 
@@ -30,7 +31,7 @@ struct SourceRow {
     start: String,
     end: String,
     version: i64,
-    cols: Vec<Option<String>>,
+    cols: Vec<Value>,
 }
 
 pub fn build_prefix_index(db_path: &Path) -> Result<(), String> {
@@ -44,7 +45,8 @@ pub fn build_prefix_index(db_path: &Path) -> Result<(), String> {
             start_ip_sort TEXT NOT NULL, end_ip_sort TEXT NOT NULL, ip_version INTEGER NOT NULL,
             registry TEXT, country TEXT, netname TEXT, cidr TEXT, asn TEXT, region TEXT, city TEXT,
             status TEXT, allocation_date TEXT, created TEXT, last_modified TEXT,
-            record_source TEXT, mnt_by TEXT, org TEXT, abuse_contact TEXT, description TEXT);",
+            record_source TEXT, mnt_by TEXT, org TEXT, abuse_contact TEXT, description TEXT,
+            latitude REAL, longitude REAL, is_fallback INTEGER);",
     )
     .map_err(|e| format!("init lookup_prefixes: {e}"))?;
 
@@ -95,8 +97,8 @@ fn fetch_batch(conn: &Connection, sql: &str, last_id: i64) -> Result<Vec<SourceR
         .map_err(|e| format!("prepare fetch: {e}"))?;
     let rows = stmt
         .query_map(params![last_id, BATCH_SIZE], |r| {
-            let cols = (4..20)
-                .map(|i| r.get::<_, Option<String>>(i))
+            let cols = (4..23)
+                .map(|i| r.get::<_, Value>(i))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(SourceRow {
                 row_id: r.get(0)?,
@@ -117,37 +119,23 @@ fn insert_batch(conn: &mut Connection, source: &str, batch: &[SourceRow]) -> Res
     {
         let mut stmt = tx
             .prepare(
-                "INSERT INTO lookup_prefixes (source, prefix_key, prefix_length, start_ip_sort, end_ip_sort, ip_version, registry, country, netname, cidr, asn, region, city, status, allocation_date, created, last_modified, record_source, mnt_by, org, abuse_contact, description) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
+                "INSERT INTO lookup_prefixes (source, prefix_key, prefix_length, start_ip_sort, end_ip_sort, ip_version, registry, country, netname, cidr, asn, region, city, status, allocation_date, created, last_modified, record_source, mnt_by, org, abuse_contact, description, latitude, longitude, is_fallback) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)",
             )
             .map_err(|e| format!("prepare insert: {e}"))?;
         for row in batch {
             let ver = u8::try_from(row.version).map_err(|_| "invalid version".to_owned())?;
             for (key, len) in range_to_prefixes(&row.start, &row.end, ver)? {
-                let c = &row.cols;
-                stmt.execute(params![
-                    source,
-                    key,
-                    i64::from(len),
-                    &row.start,
-                    &row.end,
-                    row.version,
-                    c.first().and_then(|x| x.as_deref()),
-                    c.get(1).and_then(|x| x.as_deref()),
-                    c.get(2).and_then(|x| x.as_deref()),
-                    c.get(3).and_then(|x| x.as_deref()),
-                    c.get(4).and_then(|x| x.as_deref()),
-                    c.get(5).and_then(|x| x.as_deref()),
-                    c.get(6).and_then(|x| x.as_deref()),
-                    c.get(7).and_then(|x| x.as_deref()),
-                    c.get(8).and_then(|x| x.as_deref()),
-                    c.get(9).and_then(|x| x.as_deref()),
-                    c.get(10).and_then(|x| x.as_deref()),
-                    c.get(11).and_then(|x| x.as_deref()),
-                    c.get(12).and_then(|x| x.as_deref()),
-                    c.get(13).and_then(|x| x.as_deref()),
-                    c.get(14).and_then(|x| x.as_deref()),
-                    c.get(15).and_then(|x| x.as_deref()),
-                ])
+                let prefix_params = [
+                    Value::Text(source.to_owned()),
+                    Value::Text(key),
+                    Value::Integer(i64::from(len)),
+                    Value::Text(row.start.clone()),
+                    Value::Text(row.end.clone()),
+                    Value::Integer(row.version),
+                ];
+                stmt.execute(rusqlite::params_from_iter(
+                    prefix_params.iter().chain(row.cols.iter()),
+                ))
                 .map_err(|e| format!("insert prefix: {e}"))?;
                 inserted += 1;
             }

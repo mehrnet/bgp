@@ -45,6 +45,14 @@ fn write_fixture_csvs(input: &std::path::Path) -> Result<(), Box<dyn std::error:
         pad_sort_key_str("1.1.1.255")
     );
     fs::write(input.join("geolocations.csv"), geos)?;
+    let fb_geos = format!(
+        "{},{},4,DE,Berlin,Berlin,52.52,13.405\n{},{},4,DE,Hamburg,Hamburg,53.5511,9.9937\n",
+        pad_sort_key_str("1.1.1.128"),
+        pad_sort_key_str("1.1.1.255"),
+        pad_sort_key_str("2.2.2.0"),
+        pad_sort_key_str("2.2.2.255")
+    );
+    fs::write(input.join("geolocations_fallback.csv"), fb_geos)?;
     fs::write(
         input.join("autnums.csv"),
         "AS13335,APNIC,US,CLOUDFLARENET,ORG-CLOUD,ASSIGNED,,,APNIC,,abuse@example.test,\n",
@@ -80,6 +88,7 @@ fn builds_mmap_dataset_readable_by_store() -> Result<(), Box<dyn std::error::Err
         db.geofeed(db.lookup_geofeed_lpm(ip1)?)?.city,
         "South Brisbane"
     );
+    verify_geo_fallback(&db)?;
     assert_eq!(
         db.autnum(13335, false)?.map(|a| a.name),
         Some("CLOUDFLARENET".into())
@@ -95,5 +104,19 @@ fn builds_mmap_dataset_readable_by_store() -> Result<(), Box<dyn std::error::Err
     assert_eq!(sum.allocation_records, 1);
     assert_eq!(sum.routes, 1);
     let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+fn verify_geo_fallback(db: &Db) -> Result<(), Box<dyn std::error::Error>> {
+    let rfc_wins = db.geofeed(db.lookup_geofeed_lpm("1.1.1.200".parse()?)?)?;
+    assert_eq!(rfc_wins.city, "South Brisbane");
+    assert!(!rfc_wins.is_fallback);
+    assert_eq!(rfc_wins.latitude, None);
+
+    let fb = db.geofeed(db.lookup_geofeed_lpm("2.2.2.42".parse()?)?)?;
+    assert_eq!(fb.city, "Hamburg");
+    assert!(fb.is_fallback);
+    assert_eq!(fb.latitude, Some(53.5511));
+    assert_eq!(fb.longitude, Some(9.9937));
     Ok(())
 }

@@ -68,13 +68,24 @@ pub(crate) fn decode_route(
 pub(crate) fn decode_geofeed(raw: &[u8], pool: &StringPool<'_>) -> Result<Geofeed, StoreError> {
     let mut r = Reader::new(raw);
     let version = r.byte()?;
+    let start = r.address(version)?;
+    let end = r.address(version)?;
+    let country = r.pooled_str(pool)?;
+    let region = r.pooled_str(pool)?;
+    let city = r.pooled_str(pool)?;
+    let flags = r.byte()?;
+    let latitude = (flags & 1 != 0).then(|| r.f64_be()).transpose()?;
+    let longitude = (flags & 2 != 0).then(|| r.f64_be()).transpose()?;
     let out = Geofeed {
         version,
-        start: r.address(version)?,
-        end: r.address(version)?,
-        country: r.pooled_str(pool)?,
-        region: r.pooled_str(pool)?,
-        city: r.pooled_str(pool)?,
+        start,
+        end,
+        country,
+        region,
+        city,
+        latitude,
+        longitude,
+        is_fallback: (flags & 4) != 0,
     };
     r.done()?;
     Ok(out)

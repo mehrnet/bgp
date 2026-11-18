@@ -717,6 +717,8 @@ export class LiteDB {
         country_code: geoCC || allocCC,
         region: geoRegion,
         city: geoCity,
+        latitude: null,
+        longitude: null,
       },
       sources: {
         allocation: hasAlloc,

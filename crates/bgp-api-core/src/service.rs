@@ -99,10 +99,14 @@ fn lookup_ip_full(db: &Db, ip: &RuntimeIp) -> Result<LookupResponse, ApiError> {
     let mut response = build_lookup_response(
         db,
         ip,
-        narrowest_range(&allocations, |a| (a.start, a.end)),
+        allocations
+            .iter()
+            .min_by_key(|a| range_width(a.start, a.end)),
         &selected_routes,
         origins,
-        narrowest_range(&geofeeds, |g| (g.start, g.end)),
+        geofeeds
+            .iter()
+            .min_by_key(|g| (g.is_fallback, range_width(g.start, g.end))),
     );
     response.details = Some(build_details(&allocations, &routes, &geofeeds));
     Ok(response)
@@ -179,6 +183,8 @@ fn populate_location(resp: &mut LookupResponse, geofeed: Option<&Geofeed>) {
         resp.location.country_code = country_code(opt_upper(&geo.country));
         resp.location.region = opt_trimmed(&geo.region);
         resp.location.city = opt_trimmed(&geo.city);
+        resp.location.latitude = geo.latitude;
+        resp.location.longitude = geo.longitude;
     }
     if resp.location.country_code.is_none() {
         resp.location.country_code = resp.allocation.country_code.clone();
@@ -232,18 +238,6 @@ fn narrowest_routes(routes: &[Route]) -> Vec<Route> {
         .collect()
 }
 
-fn narrowest_range<T>(items: &[T], bounds: impl Fn(&T) -> (Address, Address)) -> Option<&T> {
-    let mut iter = items.iter();
-    let mut best = iter.next()?;
-    let (bs, be) = bounds(best);
-    let mut best_w = u128::from_be_bytes(be.0).saturating_sub(u128::from_be_bytes(bs.0));
-    for item in iter {
-        let (s, e) = bounds(item);
-        let w = u128::from_be_bytes(e.0).saturating_sub(u128::from_be_bytes(s.0));
-        if w < best_w {
-            best = item;
-            best_w = w;
-        }
-    }
-    Some(best)
+fn range_width(start: Address, end: Address) -> u128 {
+    u128::from_be_bytes(end.0).saturating_sub(u128::from_be_bytes(start.0))
 }

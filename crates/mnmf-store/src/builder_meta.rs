@@ -4,7 +4,7 @@ use std::path::Path;
 use bgp_compact::sortkey::parse_asn;
 
 use crate::builder::{BuildStats, MmapWriter};
-use crate::builder_indexes::{RangePrefixPair, TableSections, write_sel_and_indexes};
+use crate::builder_indexes::{RangePrefixPair, write_geo_indexes};
 use crate::builder_tables::{field, for_each_csv_row, next_id, parse_range_row};
 use crate::encode::{StringPoolWriter, append_autnum, append_geofeed};
 use crate::index::AUTNUM_INDEX_STRIDE;
@@ -14,16 +14,59 @@ pub(crate) fn build_geofeeds(
     w: &mut MmapWriter,
     pool: &mut StringPoolWriter,
     stats: &mut BuildStats,
-    path: &Path,
+    input_dir: &Path,
 ) -> Result<(), String> {
     let data_start = w.begin_section()?;
-    let (mut offsets, mut idx, mut buf, mut data_pos) =
-        (vec![0u64], RangePrefixPair::default(), Vec::new(), 0u64);
+    let (mut offsets, mut buf, mut data_pos) = (vec![0u64], Vec::new(), 0u64);
+    let mut rfc_idx = RangePrefixPair::default();
+    let mut fb_idx = RangePrefixPair::default();
+
+    let ctx_primary = GeoWriteCtx {
+        w,
+        pool,
+        stats,
+        offsets: &mut offsets,
+        idx: &mut rfc_idx,
+        buf: &mut buf,
+        data_pos: &mut data_pos,
+    };
+    load_geofeed_file(&input_dir.join("geolocations.csv"), false, ctx_primary)?;
+
+    let fallback_path = input_dir.join("geolocations_fallback.csv");
+    if fallback_path.is_file() {
+        let ctx_fb = GeoWriteCtx {
+            w,
+            pool,
+            stats,
+            offsets: &mut offsets,
+            idx: &mut fb_idx,
+            buf: &mut buf,
+            data_pos: &mut data_pos,
+        };
+        load_geofeed_file(&fallback_path, true, ctx_fb)?;
+    }
+
+    w.end_section(Section::GeofeedData, data_start);
+    w.write_u64_section(Section::GeofeedOffsets, &offsets)?;
+    write_geo_indexes(w, &mut rfc_idx, &mut fb_idx, stats)
+}
+
+struct GeoWriteCtx<'a> {
+    w: &'a mut MmapWriter,
+    pool: &'a mut StringPoolWriter,
+    stats: &'a mut BuildStats,
+    offsets: &'a mut Vec<u64>,
+    idx: &'a mut RangePrefixPair,
+    buf: &'a mut Vec<u8>,
+    data_pos: &'a mut u64,
+}
+
+fn load_geofeed_file(path: &Path, is_fallback: bool, c: GeoWriteCtx<'_>) -> Result<(), String> {
     for_each_csv_row(path, |row| {
         let Some((ver, s, e)) = (row.len() >= 6).then(|| parse_range_row(row)).flatten() else {
             return Ok(());
         };
-        let id = next_id(stats.geofeeds)?;
+        let id = next_id(c.stats.geofeeds)?;
         let rec = Geofeed {
             version: ver,
             start: s,
@@ -31,19 +74,26 @@ pub(crate) fn build_geofeeds(
             country: field(row, 3),
             region: field(row, 4),
             city: field(row, 5),
+            latitude: parse_coord(row, 6),
+            longitude: parse_coord(row, 7),
+            is_fallback,
         };
-        buf.clear();
-        append_geofeed(&mut buf, pool, &rec);
-        w.write_all(&buf)?;
-        data_pos += buf.len() as u64;
-        offsets.push(data_pos);
-        stats.geofeed_index += idx.push_range_and_prefixes(ver, s, e, id);
-        stats.geofeeds = u64::from(id);
+        c.buf.clear();
+        append_geofeed(c.buf, c.pool, &rec);
+        c.w.write_all(c.buf)?;
+        *c.data_pos += c.buf.len() as u64;
+        c.offsets.push(*c.data_pos);
+        c.stats.geofeed_index += c.idx.push_range_and_prefixes(ver, s, e, id);
+        c.stats.geofeeds = u64::from(id);
         Ok(())
-    })?;
-    w.end_section(Section::GeofeedData, data_start);
-    w.write_u64_section(Section::GeofeedOffsets, &offsets)?;
-    write_sel_and_indexes(w, &mut idx, TableSections::GEO, stats, false)
+    })
+}
+
+fn parse_coord(row: &csv::ByteRecord, idx: usize) -> Option<f64> {
+    field(row, idx)
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
 }
 
 pub(crate) fn build_autnums(

@@ -3,7 +3,7 @@
 Two public endpoints share this response contract:
 
 - **Full API** (`https://bgp-api.mehrnet.com`): backed by the full `mehrnet_bgp.mmap` database (`MNMF` format) with every raw RIR, IRR, and geofeed field.
-- **Lite API** (`https://bgp-lite.mehrnet.com`): serverless Cloudflare Worker backed by `bgp-lite.mnl` (`MNL1` format) with zero external database calls. It serves `/v1/health`, `/v1/ip`, `/v1/country`, `/v1/asn`, and `/v1/prefix` using the same schema, keeping `autnum` contacts (`abuse_contact`, `maintainers`, `description`), `/32` IPv4 & `/64` IPv6 allocations, and geofeed `country_code`/`region`/`city` while omitting `?details=full`, `/v1/range`, allocation `netname`/`abuse_contact`/`allocation_date`, and per-route IRR prose (`null`).
+- **Lite API** (`https://bgp-lite.mehrnet.com`): serverless Cloudflare Worker backed by `bgp-lite.mnl` (`MNL1` format) with zero external database calls. It serves `/v1/health`, `/v1/ip`, `/v1/country`, `/v1/asn`, and `/v1/prefix` using the same schema, keeping `autnum` contacts (`abuse_contact`, `maintainers`, `description`), `/32` IPv4 & `/64` IPv6 allocations, and geofeed `country_code`/`region`/`city` while omitting `?details=full`, `/v1/range`, allocation `netname`/`abuse_contact`/`allocation_date`, `location.latitude`/`location.longitude`, and per-route IRR prose (`null`).
 
 `GET /v1/ip?query={address}` returns a single, stable shape. Values unavailable in the
 source data are `null`; they are never guessed.
@@ -55,7 +55,9 @@ source data are `null`; they are never guessed.
   "location": {
     "country_code": "AU",
     "region": null,
-    "city": null
+    "city": null,
+    "latitude": null,
+    "longitude": null
   },
   "sources": {
     "allocation": true,
@@ -82,7 +84,7 @@ fields may be `null` only for old local fixtures or pre-metadata datasets.
 | `allocations` | IP range, IP version, RIR registry, country, `netname`, `status`, delegated allocation date, RPSL `created`, `last-modified`, `source`, `mnt-by`, `org`, direct `abuse-c`/`abuse-mailbox`, and `descr` |
 | `routes` | IP range, IP version, route CIDR, origin ASN, RIR registry, RPSL `source`, `mnt-by`, `org`, direct `abuse-c`/`abuse-mailbox`, and `descr` |
 | `autnums` | RPSL `aut-num`, `as-name`, country, status, provenance, maintainer, organization, direct `abuse-c`/`abuse-mailbox`, and description |
-| `geolocations` | IP range, IP version, country, region, city from geofeeds |
+| `geolocations` | IP range, IP version, country, region, city, and fallback coordinates (`latitude`, `longitude`) from RFC 8805 geofeeds with DB-IP City Lite (CC BY 4.0) fallback (`is_fallback`) |
 
 `GET /v1/prefix?prefix=:cidr` returns a normalized CIDR descriptor, its
 covering allocation record, and cursor-paginated registered RPSL route

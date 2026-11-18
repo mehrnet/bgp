@@ -185,12 +185,7 @@ fn run_build(file: File, tmp: &Path, opts: &BuildOptions) -> Result<BuildStats, 
         &mut stats,
         &opts.input_dir.join("routes.csv"),
     )?;
-    build_geofeeds(
-        &mut w,
-        &mut pool,
-        &mut stats,
-        &opts.input_dir.join("geolocations.csv"),
-    )?;
+    build_geofeeds(&mut w, &mut pool, &mut stats, &opts.input_dir)?;
     build_autnums(
         &mut w,
         &mut pool,

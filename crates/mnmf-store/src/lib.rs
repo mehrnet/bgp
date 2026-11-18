@@ -138,12 +138,16 @@ impl Db {
     }
 
     pub fn lookup_geofeed_lpm(&self, ip: IpAddr) -> Result<u32, StoreError> {
-        let sec = if ip.is_ipv4() {
-            Section::GeoLpmV4
+        let (primary, fallback) = if ip.is_ipv4() {
+            (Section::GeoLpmV4, Section::GeoFallbackLpmV4)
         } else {
-            Section::GeoLpmV6
+            (Section::GeoLpmV6, Section::GeoFallbackLpmV6)
         };
-        lookup_selection_lpm(self.sec(sec), ip)
+        let id = lookup_selection_lpm(self.sec(primary), ip)?;
+        if id != 0 {
+            return Ok(id);
+        }
+        lookup_selection_lpm(self.sec(fallback), ip)
     }
 
     pub fn lookup_route_lpm(&self, ip: IpAddr) -> Result<Vec<u32>, StoreError> {
