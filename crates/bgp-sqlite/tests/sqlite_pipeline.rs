@@ -27,9 +27,10 @@ fn write_sqlite_fixtures(input: &std::path::Path) -> Result<(), Box<dyn std::err
         input.join("routes.csv"),
         format!("{s},{e},4,1.1.1.0/24,AS13335,APNIC,APNIC,,,abuse@example.test,\n"),
     )?;
+    let (bs, be) = (pad_sort_key_str("3.3.3.0"), pad_sort_key_str("3.3.3.255"));
     fs::write(
         input.join("geolocations.csv"),
-        format!("{s},{e},4,AU,QLD,Brisbane\n"),
+        format!("{s},{e},4,AU,QLD,Brisbane\n{bs},{be},4,DE,DE-BE,berlin\n"),
     )?;
     let (fs, fe) = (pad_sort_key_str("2.2.2.0"), pad_sort_key_str("2.2.2.255"));
     fs::write(
@@ -64,7 +65,7 @@ fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std
 
     let conn = Connection::open(&db_path)?;
     let pfx_rows: i64 = conn.query_row("SELECT count(*) FROM lookup_prefixes", [], |r| r.get(0))?;
-    assert_eq!(pfx_rows, 3);
+    assert_eq!(pfx_rows, 4);
     let (lat, lon, fb): (Option<f64>, Option<f64>, i64) = conn.query_row(
         "SELECT latitude, longitude, is_fallback FROM geolocations WHERE city = 'Berlin'",
         [],
@@ -73,6 +74,23 @@ fn builds_indexes_summarizes_and_validates_sqlite_db() -> Result<(), Box<dyn std
     assert_eq!(lat, Some(52.52));
     assert_eq!(lon, Some(13.405));
     assert_eq!(fb, 1);
+
+    let (b_lat, b_lon, b_fb): (Option<f64>, Option<f64>, i64) = conn.query_row(
+        "SELECT latitude, longitude, is_fallback FROM geolocations WHERE city = 'berlin'",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    assert_eq!(b_lat, Some(52.52));
+    assert_eq!(b_lon, Some(13.405));
+    assert_eq!(b_fb, 0);
+
+    let (no_lat, no_lon): (Option<f64>, Option<f64>) = conn.query_row(
+        "SELECT latitude, longitude FROM geolocations WHERE city = 'Brisbane'",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    assert_eq!(no_lat, None);
+    assert_eq!(no_lon, None);
     let tag: String =
         conn.query_row("SELECT release_tag FROM bgp_api_dataset", [], |r| r.get(0))?;
     assert_eq!(tag, "db-sql-test");

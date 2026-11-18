@@ -37,19 +37,23 @@ fn write_geo_fixtures(input: &std::path::Path) -> Result<(), Box<dyn std::error:
     fs::write(
         input.join("geolocations.csv"),
         format!(
-            "{},{},4,AU,QLD,Brisbane\n",
+            "{},{},4,AU,QLD,Brisbane\n{},{},4,DE,DE-HE,Eschborn\n",
             sort_v4("1.1.1.0")?,
-            sort_v4("1.1.1.255")?
+            sort_v4("1.1.1.255")?,
+            sort_v4("3.3.3.0")?,
+            sort_v4("3.3.3.255")?
         ),
     )?;
     fs::write(
         input.join("geolocations_fallback.csv"),
         format!(
-            "{},{},4,DE,Berlin,Berlin,52.52,13.405\n{},{},4,IR,Tehran,Tehran (District 7),35.7425,51.4402\n",
+            "{},{},4,DE,Berlin,Berlin,52.52,13.405\n{},{},4,IR,Tehran,Tehran (District 7),35.7425,51.4402\n{},{},4,DE,Hesse,eschborn,50.1501,8.58033\n",
             sort_v4("1.1.1.128")?,
             sort_v4("1.1.1.255")?,
             sort_v4("2.2.2.0")?,
-            sort_v4("2.2.2.255")?
+            sort_v4("2.2.2.255")?,
+            sort_v4("2.2.3.0")?,
+            sort_v4("2.2.3.255")?
         ),
     )?;
     Ok(())
@@ -73,22 +77,42 @@ fn lookup_ip_enforces_rfc8805_over_fallback_and_exposes_coords()
     let db = Arc::new(Db::open(&out)?);
 
     for full in [false, true] {
-        let ip_rfc = parse_runtime_ip("1.1.1.200").ok_or("bad ip")?;
-        let r_rfc = lookup_ip(&db, &ip_rfc, full).map_err(|e| format!("{e:?}"))?;
-        assert_eq!(r_rfc.location.country_code.as_deref(), Some("AU"));
-        assert_eq!(r_rfc.location.city.as_deref(), Some("Brisbane"));
-        assert_eq!(r_rfc.location.latitude, None);
-        assert_eq!(r_rfc.location.longitude, None);
-
-        let ip_fb = parse_runtime_ip("2.2.2.10").ok_or("bad ip")?;
-        let r_fb = lookup_ip(&db, &ip_fb, full).map_err(|e| format!("{e:?}"))?;
-        assert_eq!(r_fb.location.country_code.as_deref(), Some("IR"));
-        assert_eq!(r_fb.location.region.as_deref(), Some("Tehran"));
-        assert_eq!(r_fb.location.city.as_deref(), Some("Tehran (District 7)"));
-        assert_eq!(r_fb.location.latitude, Some(35.7425));
-        assert_eq!(r_fb.location.longitude, Some(51.4402));
+        assert_geo(&db, "1.1.1.200", full, ("AU", None, "Brisbane"), None)?;
+        assert_geo(
+            &db,
+            "2.2.2.10",
+            full,
+            ("IR", Some("Tehran"), "Tehran (District 7)"),
+            Some((35.7425, 51.4402)),
+        )?;
+        assert_geo(
+            &db,
+            "3.3.3.10",
+            full,
+            ("DE", Some("DE-HE"), "Eschborn"),
+            Some((50.1501, 8.58033)),
+        )?;
     }
 
     let _ = fs::remove_dir_all(&dir);
+    Ok(())
+}
+
+fn assert_geo(
+    db: &Arc<Db>,
+    ip: &str,
+    full: bool,
+    expected: (&str, Option<&str>, &str),
+    coords: Option<(f64, f64)>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let parsed = parse_runtime_ip(ip).ok_or("bad ip")?;
+    let resp = lookup_ip(db, &parsed, full).map_err(|e| format!("{e:?}"))?;
+    assert_eq!(resp.location.country_code.as_deref(), Some(expected.0));
+    if expected.1.is_some() {
+        assert_eq!(resp.location.region.as_deref(), expected.1);
+    }
+    assert_eq!(resp.location.city.as_deref(), Some(expected.2));
+    assert_eq!(resp.location.latitude, coords.map(|c| c.0));
+    assert_eq!(resp.location.longitude, coords.map(|c| c.1));
     Ok(())
 }

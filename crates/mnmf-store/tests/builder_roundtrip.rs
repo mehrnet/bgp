@@ -40,9 +40,11 @@ fn write_fixture_csvs(input: &std::path::Path) -> Result<(), Box<dyn std::error:
     );
     fs::write(input.join("routes.csv"), routes)?;
     let geos = format!(
-        "{},{},4,AU,Queensland,South Brisbane\n",
+        "{},{},4,AU,Queensland,South Brisbane\n{},{},4,DE,DE-HH,Hamburg\n",
         pad_sort_key_str("1.1.1.0"),
-        pad_sort_key_str("1.1.1.255")
+        pad_sort_key_str("1.1.1.255"),
+        pad_sort_key_str("3.3.3.0"),
+        pad_sort_key_str("3.3.3.255")
     );
     fs::write(input.join("geolocations.csv"), geos)?;
     let fb_geos = format!(
@@ -118,5 +120,11 @@ fn verify_geo_fallback(db: &Db) -> Result<(), Box<dyn std::error::Error>> {
     assert!(fb.is_fallback);
     assert_eq!(fb.latitude, Some(53.5511));
     assert_eq!(fb.longitude, Some(9.9937));
+
+    let backfilled = db.geofeed(db.lookup_geofeed_lpm("3.3.3.10".parse()?)?)?;
+    assert_eq!(backfilled.city, "Hamburg");
+    assert!(!backfilled.is_fallback);
+    assert_eq!(backfilled.latitude, Some(53.5511));
+    assert_eq!(backfilled.longitude, Some(9.9937));
     Ok(())
 }

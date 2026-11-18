@@ -1,3 +1,4 @@
+pub mod city_coords;
 pub mod cli;
 pub mod country_db;
 pub mod country_reader;
