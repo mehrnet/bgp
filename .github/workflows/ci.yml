@@ -16,9 +16,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - run: ./scripts/check-quality.sh
-        working-directory: rust
-      - run: npm --prefix workers/bgp-lite test
+      - name: Run Rust quality gate (line limits, fmt, clippy, unit tests)
+        run: ./scripts/check-quality.sh
+      - name: Run bgp-lite worker tests
+        run: npm --prefix lite test
+      - name: Build static Linux x86_64 musl API binary
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: rust-lld
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: |
+          cargo build --release --target x86_64-unknown-linux-musl -p bgp-api-server --bin bgp-api
+          file target/x86_64-unknown-linux-musl/release/bgp-api

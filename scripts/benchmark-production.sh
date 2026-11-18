@@ -13,8 +13,8 @@ WARMUP="${BGP_API_BENCH_WARMUP:-200}"
 BENCHMARK_BINARY="${BGP_API_BENCHMARK_BINARY:-$PWD/bin/bgp-api-benchmark}"
 
 mkdir -p "$(dirname "$BENCHMARK_BINARY")"
-cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin benchmark-http
-cp rust/target/release/benchmark-http "$BENCHMARK_BINARY"
+cargo build -p bgp-tools --release --bin benchmark-http
+cp target/release/benchmark-http "$BENCHMARK_BINARY"
 
 origin_slot="$(ssh "$ORIGIN_HOST" 'cat /var/lib/bgp-api/active-slot')"
 case "$origin_slot" in

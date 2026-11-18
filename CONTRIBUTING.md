@@ -1,4 +1,4 @@
-# Rust Codebase Standards (`rust/`)
+# Rust Codebase Standards
 
 This workspace implements the bare-metal MehrNet BGP API runtime reading immutable
 `MNMF` (`mehrnet_bgp.mmap`) datasets directly from virtual memory.
@@ -17,10 +17,11 @@ This workspace implements the bare-metal MehrNet BGP API runtime reading immutab
 
 ## Mandatory Verification Gate
 
-Before committing any change under `rust/`, run from `rust/`:
+Before committing any change, run from the repository root:
 
 ```sh
 ./scripts/check-quality.sh
+npm --prefix lite test
 ```
 
 This runs line-count enforcement, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test --all-targets`.

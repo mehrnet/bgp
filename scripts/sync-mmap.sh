@@ -639,8 +639,7 @@ else
   stop_service "$SECONDARY_SERVICE"
   wait_stopped "$SERVICE" || die "$SERVICE did not stop"
   wait_stopped "$SECONDARY_SERVICE" || die "$SECONDARY_SERVICE did not stop"
-  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH" "$LEGACY_DATABASE_PATH" \
-    "$DATA_DIR/primary.bbolt" "$DATA_DIR/secondary.bbolt" "$DATA_DIR/mehrnet_bgp.bbolt"
+  rm -f -- "$PRIMARY_DATABASE_PATH" "$SECONDARY_DATABASE_PATH" "$LEGACY_DATABASE_PATH"
   mv "$new_database" "$PRIMARY_DATABASE_PATH"
   chown bgpapi:bgpapi "$PRIMARY_DATABASE_PATH"
   chmod 0440 "$PRIMARY_DATABASE_PATH"

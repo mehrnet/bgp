@@ -52,8 +52,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "rust -> target"
       - name: Install download client
         run: sudo apt-get update && sudo apt-get install -y aria2
       - name: Select RIR source files
@@ -87,7 +85,7 @@ jobs:
       - name: Download RIR data
         run: aria2c -x 16 -s 16 -j 5 --dir=raw_data --input-file=urls.txt
       - name: Parse source records
-        run: cargo run --manifest-path rust/Cargo.toml -p bgp-tools --release --bin parse-rir -- ${{ matrix.rir }}
+        run: cargo run -p bgp-tools --release --bin parse-rir -- ${{ matrix.rir }}
       - uses: actions/upload-artifact@v6
         with:
           name: data-${{ matrix.rir }}
@@ -112,8 +110,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: geofeeds-*
@@ -125,7 +121,7 @@ jobs:
           touch artifacts/geofeeds_dummy.txt
           cat artifacts/geofeeds_*.txt | sort -u > final_data/geofeeds.txt
       - name: Fetch geofeeds
-        run: cargo run --manifest-path rust/Cargo.toml -p bgp-tools --release --bin fetch-geofeeds
+        run: cargo run -p bgp-tools --release --bin fetch-geofeeds
       - uses: actions/upload-artifact@v6
         with:
           name: geofeed-locations
@@ -152,8 +148,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: data-*
@@ -175,8 +169,8 @@ jobs:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-mmap-dataset
-          ./rust/target/release/build-mmap-dataset \
+          cargo build -p bgp-tools --release --bin build-mmap-dataset
+          ./target/release/build-mmap-dataset \
             -input final_data \
             -output mehrnet_bgp.mmap \
             -release-tag "$RELEASE_TAG" \
@@ -189,29 +183,29 @@ jobs:
           BGP_API_DATABASE_PATH: ${{ github.workspace }}/mehrnet_bgp.mmap
           BGP_API_VALIDATE_ONLY: "1"
         run: |
-          cargo test --manifest-path rust/Cargo.toml -p mnmf-store -p bgp-api-core -p bgp-api-server
-          cargo build --manifest-path rust/Cargo.toml -p bgp-api-server --release --bin bgp-api
-          ./rust/target/release/bgp-api
+          cargo test -p mnmf-store -p bgp-api-core -p bgp-api-server
+          cargo build -p bgp-api-server --release --bin bgp-api
+          ./target/release/bgp-api
       - name: Build immutable SQLite database
         if: matrix.format == 'sqlite'
         env:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           DATASET_BUILT_AT: ${{ needs.release-metadata.outputs.dataset_built_at }}
         run: |
-          cargo build --manifest-path rust/Cargo.toml -p bgp-sqlite --release \
+          cargo build -p bgp-sqlite --release \
             --bin build-sqlite-dataset \
             --bin build-prefix-index \
             --bin build-range-summaries \
             --bin validate-database
-          ./rust/target/release/build-sqlite-dataset \
+          ./target/release/build-sqlite-dataset \
             -input final_data \
             -output mehrnet_bgp.db \
             -release-tag "$RELEASE_TAG" \
             -built-at "$DATASET_BUILT_AT" \
             -source-commit "$GITHUB_SHA"
-          ./rust/target/release/build-prefix-index mehrnet_bgp.db
-          ./rust/target/release/build-range-summaries mehrnet_bgp.db
-          ./rust/target/release/validate-database -indexed mehrnet_bgp.db
+          ./target/release/build-prefix-index mehrnet_bgp.db
+          ./target/release/build-range-summaries mehrnet_bgp.db
+          ./target/release/validate-database -indexed mehrnet_bgp.db
           test -s mehrnet_bgp.db
       - name: Compress and upload database
         env:
@@ -236,8 +230,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "rust -> target"
       - uses: actions/download-artifact@v6
         with:
           pattern: data-*
@@ -250,9 +242,9 @@ jobs:
       - name: Build and test country database
         run: |
           cat artifacts/allocations_*.csv > final_data/allocations.csv
-          cargo test --manifest-path rust/Cargo.toml -p bgp-compact
-          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-country-db
-          ./rust/target/release/build-country-db -input final_data -output country.mncc
+          cargo test -p bgp-compact
+          cargo build -p bgp-tools --release --bin build-country-db
+          ./target/release/build-country-db -input final_data -output country.mncc
           test -s country.mncc
       - name: Upload country database
         env:
@@ -276,8 +268,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "rust -> target"
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -299,22 +289,22 @@ jobs:
           cat artifacts/routes_*.csv > final_data/routes.csv
           cat artifacts/autnums_*.csv > final_data/autnums.csv
           test -s final_data/geolocations.csv
-          cargo test --manifest-path rust/Cargo.toml -p bgp-compact
-          npm --prefix workers/bgp-lite test
-          cargo build --manifest-path rust/Cargo.toml -p bgp-tools --release --bin build-lite-db
-          ./rust/target/release/build-lite-db \
+          cargo test -p bgp-compact
+          npm --prefix lite test
+          cargo build -p bgp-tools --release --bin build-lite-db
+          ./target/release/build-lite-db \
             -input final_data \
-            -output workers/bgp-lite/bgp-lite.mnl \
+            -output lite/bgp-lite.mnl \
             -release-tag "$RELEASE_TAG" \
             -built-at "$DATASET_BUILT_AT" \
             -source-commit "$GITHUB_SHA"
-          test -s workers/bgp-lite/bgp-lite.mnl
+          test -s lite/bgp-lite.mnl
       - name: Upload bgp-lite database
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
-          cp workers/bgp-lite/bgp-lite.mnl bgp-lite.mnl
+          cp lite/bgp-lite.mnl bgp-lite.mnl
           sha256sum bgp-lite.mnl > checksum-lite.txt
           gh release upload "$RELEASE_TAG" bgp-lite.mnl --clobber
       - uses: actions/upload-artifact@v6
@@ -328,7 +318,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
-          npx --yes wrangler@4 deploy --config workers/bgp-lite/wrangler.toml
+          npx --yes wrangler@4 deploy --config lite/wrangler.toml
 
   build-api-binaries:
     name: Build static API binaries
@@ -359,8 +349,8 @@ jobs:
             arch="$1"
             target="$2"
             binary="bgp-api-linux-${arch}"
-            cargo build --manifest-path rust/Cargo.toml -p bgp-api-server --release --target "$target" --bin bgp-api
-            cp "rust/target/${target}/release/bgp-api" "release/bin/$binary"
+            cargo build -p bgp-api-server --release --target "$target" --bin bgp-api
+            cp "target/${target}/release/bgp-api" "release/bin/$binary"
             chmod 0755 "release/bin/$binary"
             file "release/bin/$binary"
             tar -C release/bin -czf "release/${binary}.tar.gz" "$binary"
@@ -432,7 +422,7 @@ jobs:
           - `mehrnet_bgp_mmap.tar.zst` contains the ready-to-query zero-copy mmap database. No import or index build is required on the API server.
           - `mehrnet_bgp_sqlite.tar.zst` contains the ready-to-query SQLite database for third-party users and offline inspection.
           - `country.mncc` is a tiny IP-to-country-code database (MNCC format) for bundling into clients; see `docs/country-database.md`.
-          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`workers/bgp-lite`).
+          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`lite/`).
           - `bgp-api-linux-amd64.tar.gz` and `bgp-api-linux-arm64.tar.gz` contain statically linked API binaries.
           - `SHA256SUMS.txt` verifies every downloadable payload.
           EOF

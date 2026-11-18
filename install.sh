@@ -16,7 +16,6 @@ readonly SERVICE_FILE="/etc/systemd/system/bgp-api.service"
 readonly SECONDARY_SERVICE_FILE="/etc/systemd/system/bgp-api-secondary.service"
 readonly SYNC_SERVICE_FILE="/etc/systemd/system/bgp-api-sync.service"
 readonly SYNC_SCRIPT="$INSTALL_DIR/scripts/sync-mmap.sh"
-readonly LEGACY_SYNC_SCRIPT="$INSTALL_DIR/scripts/sync-bbolt.sh"
 readonly INSTALLED_SCRIPT="$INSTALL_DIR/install.sh"
 readonly CRON_FILE="/etc/cron.d/mehrnet-bgp-api-update"
 readonly CADDY_CONFIG="/etc/caddy/conf.d/mehrnet-bgp-api.caddy"
@@ -332,14 +331,12 @@ download "$raw/deploy/Caddyfile" "$work_dir/Caddyfile"
 download "$raw/deploy/caddy.service.d.env.conf" "$work_dir/caddy.service.d.env.conf"
 install -m 0755 "$work_dir/install.sh" "$INSTALLED_SCRIPT"
 install -m 0755 "$work_dir/sync-mmap.sh" "$SYNC_SCRIPT"
-rm -f -- "$LEGACY_SYNC_SCRIPT"
 install -m 0644 "$work_dir/bgp-api.service" "$SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-secondary.service" "$SECONDARY_SERVICE_FILE"
 install -m 0644 "$work_dir/bgp-api-sync.service" "$SYNC_SERVICE_FILE"
 
 # Stop both services before migrating from legacy paths or switching slot layout.
 systemctl stop bgp-api.service bgp-api-secondary.service >/dev/null 2>&1 || true
-rm -f -- "$DATA_DIR/mehrnet_bgp.bbolt" "$DATA_DIR/primary.bbolt" "$DATA_DIR/secondary.bbolt"
 if [ -e "$DATA_DIR/mehrnet_bgp.mmap" ] && [ ! -e "$DATA_DIR/primary.mmap" ]; then
   mv "$DATA_DIR/mehrnet_bgp.mmap" "$DATA_DIR/primary.mmap"
 fi
@@ -353,23 +350,11 @@ if [ "$DOMAIN_SET" = true ]; then
     origin_token="$(openssl rand -hex 32)"
   fi
 fi
-go_memory_limit=384MiB
-# Cache strategy selection happens in the API after it inspects the deployed
-# dataset and host memory. Keep Go's heap below the page-cache budget.
-memory_kib="$(awk '/^MemTotal:/ { print $2; exit }' /proc/meminfo)"
-if [ -n "$memory_kib" ] && [ "$memory_kib" -ge 5000000 ]; then
-  go_memory_limit=1024MiB
-elif [ -n "$memory_kib" ] && [ "$memory_kib" -ge 3000000 ]; then
-  go_memory_limit=1536MiB
-elif [ -n "$memory_kib" ] && [ "$memory_kib" -ge 1800000 ]; then
-  go_memory_limit=1024MiB
-fi
 cat > "$ENV_FILE" <<EOF
 BGP_API_DATABASE_PATH=$DATA_DIR/primary.mmap
 BGP_API_PRIMARY_DATABASE_PATH=$DATA_DIR/primary.mmap
 LISTEN_ADDR=127.0.0.1:3102
 GOMAXPROCS=2
-GOMEMLIMIT=$go_memory_limit
 BGP_API_CACHE_STRATEGY=auto
 BGP_API_DEFER_CACHE_WARMUP=0
 BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
@@ -384,7 +369,6 @@ BGP_API_DATABASE_PATH=$DATA_DIR/secondary.mmap
 BGP_API_SECONDARY_DATABASE_PATH=$DATA_DIR/secondary.mmap
 LISTEN_ADDR=127.0.0.1:3103
 GOMAXPROCS=2
-GOMEMLIMIT=$go_memory_limit
 BGP_API_CACHE_STRATEGY=auto
 BGP_API_DEFER_CACHE_WARMUP=0
 BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
