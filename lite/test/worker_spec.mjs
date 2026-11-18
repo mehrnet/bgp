@@ -10,7 +10,7 @@ import { LiteDB } from "../src/mnl1.js";
 import { handleRequest } from "../src/handler.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "../../..");
+const repoRoot = path.resolve(here, "../..");
 
 function padV4(ip) {
   const parts = ip.split(".").map(Number);
@@ -77,10 +77,15 @@ function buildFixtureDB() {
 
     const out = path.join(tmp, "bgp-lite.mnl");
     execFileSync(
-      "go",
+      "cargo",
       [
         "run",
-        "./cmd/build-lite-db",
+        "--quiet",
+        "-p",
+        "bgp-tools",
+        "--bin",
+        "build-lite-db",
+        "--",
         "-input",
         tmp,
         "-output",

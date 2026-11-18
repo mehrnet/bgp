@@ -49,6 +49,6 @@ IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d`) are looked up as IPv4.
 3. Scan at most `blockSize` entries, accumulating deltas, until the next start exceeds the slot;
 the previous entry's country index is the answer (0 → unknown).
 
-The reference reader is [`internal/countrydb`](../internal/countrydb/countrydb.go) (`Open`, `Lookup`).
+The reference reader is [`crates/bgp-compact`](../crates/bgp-compact/src/country_reader.rs) (`CountryDb::open`, `CountryDb::lookup`).
 It needs only the raw bytes, so porting it to Kotlin/Java is ~60 lines; a memory-mapped
 `ByteBuffer` works without copying.

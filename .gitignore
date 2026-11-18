@@ -6,4 +6,6 @@
 mehrnet_bgp.db
 *.test
 *.mnl
-rust/target/
+/target/
+.wrangler/
+node_modules/

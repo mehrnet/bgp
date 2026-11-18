@@ -16,7 +16,7 @@ RIR, RDAP, routing, or geolocation services while handling a request.
 
 | Capability | Full API (`https://bgp-api.mehrnet.com`) | Lite API (`https://bgp-lite.mehrnet.com`) |
 | :--- | :--- | :--- |
-| Runtime | Bare-metal Go + zero-copy `mmap` (`MNMF`) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~38 MiB) |
+| Runtime | Bare-metal Rust + zero-copy `mmap` (`MNMF`) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~38 MiB) |
 | `GET /v1/health` | Yes (`database: "mmap"`) | Yes (`mode: "lite"`, `database: "lite"`) |
 | `GET /v1/ip?query=:ip` | Full IP, route, allocation, geofeed (`country_code`, `region`, `city`), WHOIS (`netname`, `abuse_contact`, dates) | IP, route (`cidr`, `asns`, `origins`), allocation (`registry`, `country_code`, `/32` v4 & `/64` v6), geofeed (`country_code`, `region`, `city`); omits WHOIS prose & `details=full` |
 | `GET /v1/country?query=:ip` | — | Yes (plain text or `?format=json`) |
@@ -33,7 +33,7 @@ RIR, RDAP, routing, or geolocation services while handling a request.
 - Root access
 - An active release database plus temporary space for a second copy during updates
 
-Go and a compiler are not required.
+Rust and a compiler are not required for production installation.
 
 ### Local service
 
@@ -128,8 +128,8 @@ journalctl -u bgp-api-sync --since today
 The benchmark keeps connections alive and measures the private loopback origin, direct-origin
 HTTPS, and public HTTPS through Cloudflare from an independent host. Direct-origin HTTPS keeps
 the hostname for TLS SNI but connects to `BGP_API_ORIGIN_IP`, bypassing Cloudflare only for the
-measurement. It is a development operation, not a runtime dependency; Go is needed only on the
-machine that runs the script.
+measurement. It is a development operation, not a runtime dependency; Rust (`cargo`) is needed only
+on the machine that runs the script.
 
 ```sh
 BGP_API_ORIGIN_HOST=root@78.31.250.179 \
@@ -232,18 +232,17 @@ The installer writes `/etc/bgp-api/bgp-api.env`:
 | `ORIGIN_AUTH_TOKEN` | empty | Proxy-to-origin authentication token |
 | `BGP_API_COMPACT_CACHE_MIB` | strategy default | Override the in-process cache budget for default IP responses |
 | `BGP_API_RESOURCE_CACHE_MIB` | strategy default | Override the in-process cache budget for prefix, range, and ASN responses |
-| `GOMAXPROCS` | Go default | CPU limit |
-| `GOMEMLIMIT` | Go default | Soft Go heap limit |
+| `GOMAXPROCS` | host CPU count | Worker threads override (`1`–`256`) |
 
 `auto` selects the safest profile from the deployed `mmap` file size and `MemTotal`:
 
 | Profile | Runtime behavior |
 | --- | --- |
 | `minimal` | `64 MiB` compact cache, `16 MiB` resource cache, no dataset preload |
-| `balanced` | `256 MiB` compact cache, `64 MiB` resource cache, warming the LPM selector slices in the kernel page cache (zero Go heap copy) |
+| `balanced` | `256 MiB` compact cache, `64 MiB` resource cache, warming the LPM selector slices in the kernel page cache (without copying the dataset onto the heap) |
 | `full` | `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable `mmap` file through the Linux page cache |
 
-`full` is not a second Go copy of the database. It needs the dataset, response-cache
+`full` does not copy the database into process heap memory. It needs the dataset, response-cache
 budget, and a `768 MiB` operating-system reserve to fit at once, while the kernel
 can reclaim mapped pages under pressure.
 
@@ -270,25 +269,37 @@ requests.
 
 ## Build from source
 
-Go 1.22 or newer is required for local builds.
+Rust 1.88 or newer is required for local builds (`edition = "2024"`).
+
+Repository layout:
+
+- `crates/mnmf-store`: zero-copy `MNMF` reader and builder
+- `crates/bgp-api-core`: shared request routing, response models, pagination, CORS/auth, and caches
+- `crates/bgp-api-server`: bare-metal Tokio + Hyper `bgp-api` binary
+- `crates/bgp-compact`: `country.mncc` (`MNCC`) and `bgp-lite.mnl` (`MNL1`) readers/builders
+- `crates/bgp-sqlite`: SQLite export builder, indexer, summary generator, and validator
+- `crates/bgp-tools`: pipeline tools (`parse-rir`, `fetch-geofeeds`, `build-mmap-dataset`, `build-country-db`, `build-lite-db`, `benchmark-http`)
+- `lite/`: standalone Cloudflare Worker for `bgp-lite.mehrnet.com`
 
 Run the API against a local dataset:
 
 ```sh
 export BGP_API_DATABASE_PATH="$PWD/mehrnet_bgp.mmap"
-go run ./cmd/bgp-api
+cargo run --release -p bgp-api-server --bin bgp-api
 ```
 
-Build a static binary:
+Build a static Linux `amd64` musl binary:
 
 ```sh
-CGO_ENABLED=0 go build -trimpath -o bin/bgp-api ./cmd/bgp-api
+CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld \
+RUSTFLAGS="-C target-feature=+crt-static" \
+cargo build --release --target x86_64-unknown-linux-musl -p bgp-api-server --bin bgp-api
 ```
 
 Build a `mmap` dataset from producer output:
 
 ```sh
-go run ./cmd/build-mmap-dataset \
+cargo run --release -p bgp-tools --bin build-mmap-dataset -- \
   -input final_data \
   -output mehrnet_bgp.mmap \
   -release-tag local \
@@ -299,21 +310,20 @@ go run ./cmd/build-mmap-dataset \
 The optional SQLite export is built from the same `final_data/` directory:
 
 ```sh
-go run ./cmd/build-sqlite-dataset \
+cargo run --release -p bgp-sqlite --bin build-sqlite-dataset -- \
   -input final_data \
   -output mehrnet_bgp.db \
   -release-tag local \
   -built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -source-commit "$(git rev-parse HEAD)"
-go run ./cmd/build-prefix-index mehrnet_bgp.db
-go run ./cmd/build-range-summaries mehrnet_bgp.db
-go run ./cmd/validate-database -indexed mehrnet_bgp.db
+cargo run --release -p bgp-sqlite --bin build-prefix-index -- mehrnet_bgp.db
+cargo run --release -p bgp-sqlite --bin build-range-summaries -- mehrnet_bgp.db
+cargo run --release -p bgp-sqlite --bin validate-database -- -indexed mehrnet_bgp.db
 ```
 
 ## Development
 
 ```sh
-go test ./...
-go test -race ./...
-go vet ./...
+./scripts/check-quality.sh
+npm --prefix lite test
 ```
