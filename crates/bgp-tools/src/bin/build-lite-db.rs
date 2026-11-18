@@ -6,9 +6,11 @@ use std::process;
 use bgp_compact::cli::ParsedArgs;
 use bgp_compact::lite_db::LiteDbBuilder;
 use bgp_compact::lite_types::{
-    AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, LiteBuildOptions, LiteMetadata,
+    AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, DEFAULT_GEO_V4_BITS,
+    DEFAULT_GEO_V6_BITS, LiteBuildOptions, LiteMetadata,
 };
 use bgp_compact::sortkey::{addr_from_sort_key, cidr_to_bounds, parse_asn};
+use bgp_tools::dbip::load_dbip_fallback;
 
 fn main() {
     if let Err(err) = run() {
@@ -23,11 +25,14 @@ fn run() -> Result<(), String> {
         &[
             "input",
             "output",
+            "dbip",
             "release-tag",
             "built-at",
             "source-commit",
             "alloc-v4-prefix",
             "alloc-v6-prefix",
+            "geo-v4-prefix",
+            "geo-v6-prefix",
         ],
         &["include-asn-routes"],
     )?;
@@ -36,12 +41,16 @@ fn run() -> Result<(), String> {
     let output = args.get("output").unwrap_or("bgp-lite.mnl");
     let mut b = LiteDbBuilder::new(opts);
     let (ac, alc, gc, rc) = load_csvs(input, &mut b)?;
+    let dc = match args.get("dbip") {
+        Some(path) if !path.is_empty() => load_dbip_fallback(Path::new(path), &mut b)?,
+        _ => 0,
+    };
     let tmp = format!("{output}.tmp");
     let mut file = File::create(&tmp).map_err(|e| format!("create {tmp}: {e}"))?;
     let stats = b.encode(&mut file)?;
     drop(file);
     fs::rename(&tmp, output).map_err(|e| format!("rename {output}: {e}"))?;
-    println!("loaded autnums={ac} allocations={alc} geofeeds={gc} routes={rc}");
+    println!("loaded autnums={ac} allocations={alc} geofeeds={gc} dbip={dc} routes={rc}");
     println!(
         "wrote {output}: bytes={} ({:.2} MiB) countries={} registries={} regions={} cities={} geolocs={} alloc=({},{}) geo=({},{}) route=({},{}) multi_sets={} asn_routes={}",
         stats.bytes,
@@ -64,22 +73,10 @@ fn run() -> Result<(), String> {
 }
 
 fn parse_options(args: &ParsedArgs) -> Result<LiteBuildOptions, String> {
-    let v4: u8 = args
-        .get("alloc-v4-prefix")
-        .map_or(Ok(DEFAULT_ALLOC_V4_BITS), |s| {
-            s.parse().map_err(|_| "invalid alloc-v4-prefix".to_owned())
-        })?;
-    let v6: u8 = args
-        .get("alloc-v6-prefix")
-        .map_or(Ok(DEFAULT_ALLOC_V6_BITS), |s| {
-            s.parse().map_err(|_| "invalid alloc-v6-prefix".to_owned())
-        })?;
-    if !(1..=32).contains(&v4) {
-        return Err(format!("invalid -alloc-v4-prefix {v4} (must be 1..32)"));
-    }
-    if !(1..=64).contains(&v6) {
-        return Err(format!("invalid -alloc-v6-prefix {v6} (must be 1..64)"));
-    }
+    let v4 = parse_prefix_arg(args, "alloc-v4-prefix", DEFAULT_ALLOC_V4_BITS, 32)?;
+    let v6 = parse_prefix_arg(args, "alloc-v6-prefix", DEFAULT_ALLOC_V6_BITS, 64)?;
+    let gv4 = parse_prefix_arg(args, "geo-v4-prefix", DEFAULT_GEO_V4_BITS, 32)?;
+    let gv6 = parse_prefix_arg(args, "geo-v6-prefix", DEFAULT_GEO_V6_BITS, 64)?;
     Ok(LiteBuildOptions {
         metadata: LiteMetadata {
             release_tag: args.get("release-tag").unwrap_or("").to_owned(),
@@ -89,7 +86,19 @@ fn parse_options(args: &ParsedArgs) -> Result<LiteBuildOptions, String> {
         include_asn_routes: args.get_bool("include-asn-routes", true),
         alloc_v4_bits: v4,
         alloc_v6_bits: v6,
+        geo_v4_bits: gv4,
+        geo_v6_bits: gv6,
     })
+}
+
+fn parse_prefix_arg(args: &ParsedArgs, name: &str, def: u8, max: u8) -> Result<u8, String> {
+    let v: u8 = args.get(name).map_or(Ok(def), |s| {
+        s.parse().map_err(|_| format!("invalid {name}"))
+    })?;
+    if !(1..=max).contains(&v) {
+        return Err(format!("invalid -{name} {v} (must be 1..{max})"));
+    }
+    Ok(v)
 }
 
 fn load_csvs(dir: &Path, b: &mut LiteDbBuilder) -> Result<(usize, usize, usize, usize), String> {

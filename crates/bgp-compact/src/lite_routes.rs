@@ -114,89 +114,97 @@ pub(crate) fn build_route_segments(
     let mut multi_sets: Vec<Vec<u32>> = Vec::new();
     let mut multi_map: HashMap<Vec<u32>, u32> = HashMap::new();
     let mut seq = b.seq;
-    let iv4 = build_v4_intervals(
-        &b.route_origins_v4,
+    let iv4 = build_route_intervals(
+        b.route_origins_v4
+            .iter()
+            .map(|(&(addr, bits), origs)| (u64::from(addr), bits, origs)),
+        32,
         asn_to_idx,
         &mut multi_sets,
         &mut multi_map,
         &mut seq,
     );
-    let iv6 = build_v6_intervals(
-        &b.route_origins_v6,
+    let iv6 = build_route_intervals(
+        b.route_origins_v6
+            .iter()
+            .map(|(&(hi_net, bits), origs)| (hi_net, bits, origs)),
+        64,
         asn_to_idx,
         &mut multi_sets,
         &mut multi_map,
         &mut seq,
     );
     b.seq = seq;
-    let segs4 = flatten_intervals(
+    let mut segs4 = flatten_intervals(
         iv4,
         DEFAULT_ROUTE_V4_BITS,
         Some(&same_cidr_block(DEFAULT_ROUTE_V4_BITS)),
     );
-    let segs6 = flatten_intervals(
+    let mut segs6 = flatten_intervals(
         iv6,
         DEFAULT_ROUTE_V6_BITS,
         Some(&same_cidr_block(DEFAULT_ROUTE_V6_BITS)),
     );
+    let route_val_table = rank_route_values(&mut segs4, &mut segs6);
     RouteTables {
         segs4,
         segs6,
         multi_sets,
+        route_val_table,
     }
 }
 
-fn build_v4_intervals(
-    origins: &HashMap<(u32, u8), Vec<u32>>,
+fn rank_route_values(
+    segs4: &mut [crate::sweep::Segment],
+    segs6: &mut [crate::sweep::Segment],
+) -> Vec<u32> {
+    let mut freq: HashMap<u32, usize> = HashMap::new();
+    for s in segs4.iter().chain(segs6.iter()).filter(|s| s.val != 0) {
+        *freq.entry(s.val).or_insert(0) += 1;
+    }
+    let mut table: Vec<u32> = freq.keys().copied().collect();
+    table.sort_by(|a, b| freq.get(b).cmp(&freq.get(a)).then_with(|| a.cmp(b)));
+    let mut remap: HashMap<u32, u32> = HashMap::with_capacity(table.len());
+    for (i, &orig) in table.iter().enumerate() {
+        remap.insert(orig, (i + 1) as u32);
+    }
+    for s in segs4.iter_mut().chain(segs6.iter_mut()) {
+        if let Some(&mapped) = (s.val != 0).then(|| remap.get(&s.val)).flatten() {
+            s.val = mapped;
+        }
+    }
+    table
+}
+
+fn build_route_intervals<'a, I>(
+    entries: I,
+    max_bits: u8,
     asn_to_idx: &HashMap<u32, u32>,
     multi_sets: &mut Vec<Vec<u32>>,
     multi_map: &mut HashMap<Vec<u32>, u32>,
     seq: &mut usize,
-) -> Vec<Interval> {
+) -> Vec<Interval>
+where
+    I: ExactSizeIterator<Item = (u64, u8, &'a Vec<u32>)>,
+{
     let asn_count = asn_to_idx.len() as u32;
-    let mut out = Vec::with_capacity(origins.len());
-    for (&(addr, bits), origs) in origins {
+    let max_mask = if max_bits == 32 {
+        0xffff_ffff
+    } else {
+        u64::MAX
+    };
+    let mut out = Vec::with_capacity(entries.len());
+    for (lo, bits, origs) in entries {
         let val = resolve_asn_set(origs, asn_to_idx, asn_count, multi_sets, multi_map);
-        let shift = 32 - u32::from(bits);
-        let lo = u64::from(addr);
-        let hi = if shift == 32 {
-            0xffff_ffff
+        let shift = u32::from(max_bits - bits);
+        let hi = if shift >= u32::from(max_bits) {
+            max_mask
         } else {
             lo | ((1u64 << shift) - 1)
         };
         *seq += 1;
         out.push(Interval {
             start: lo,
-            end: hi,
-            val,
-            aux: bits,
-            priority: i64::from(bits),
-            seq: *seq,
-        });
-    }
-    out
-}
-
-fn build_v6_intervals(
-    origins: &HashMap<(u64, u8), Vec<u32>>,
-    asn_to_idx: &HashMap<u32, u32>,
-    multi_sets: &mut Vec<Vec<u32>>,
-    multi_map: &mut HashMap<Vec<u32>, u32>,
-    seq: &mut usize,
-) -> Vec<Interval> {
-    let asn_count = asn_to_idx.len() as u32;
-    let mut out = Vec::with_capacity(origins.len());
-    for (&(hi_net, bits), origs) in origins {
-        let val = resolve_asn_set(origs, asn_to_idx, asn_count, multi_sets, multi_map);
-        let shift = 64 - u32::from(bits);
-        let hi = if shift == 64 {
-            u64::MAX
-        } else {
-            hi_net | ((1u64 << shift) - 1)
-        };
-        *seq += 1;
-        out.push(Interval {
-            start: hi_net,
             end: hi,
             val,
             aux: bits,

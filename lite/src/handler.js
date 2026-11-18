@@ -102,7 +102,7 @@ function parseASN(raw) {
   return n;
 }
 
-export function handleRequest(db, request, env = {}) {
+export async function handleRequest(db, request, env = {}) {
   const headers = corsHeaders(request, env);
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -148,7 +148,7 @@ export function handleRequest(db, request, env = {}) {
     if (!ip) {
       return errorResponse(400, "INVALID_IP", "query must be a valid IPv4 or IPv6 address", headers);
     }
-    const result = db.lookupIP(ip);
+    const result = await db.lookupIP(ip);
     const cc = result && result.location ? result.location.country_code : null;
     if (!cc) {
       return errorResponse(404, "IP_NOT_FOUND", "no country code matched this IP", headers);
@@ -175,7 +175,7 @@ export function handleRequest(db, request, env = {}) {
     if (details !== "" && details !== "full") {
       return errorResponse(400, "INVALID_DETAILS", "details must be full when present", headers);
     }
-    const result = db.lookupIP(ip);
+    const result = await db.lookupIP(ip);
     if (!result) {
       return errorResponse(
         404,
@@ -207,7 +207,7 @@ export function handleRequest(db, request, env = {}) {
       return errorResponse(400, page.error[0], page.error[1], headers);
     }
     const offset = page.numbered ? (page.page - 1) * page.limit : page.cursor;
-    const res = db.lookupASN(asNumber, offset, page.limit);
+    const res = await db.lookupASN(asNumber, offset, page.limit);
     if (!res) {
       return errorResponse(404, "ASN_NOT_FOUND", "no aut-num or route record matched this ASN", headers);
     }
@@ -235,7 +235,7 @@ export function handleRequest(db, request, env = {}) {
     if (page.error) {
       return errorResponse(400, page.error[0], page.error[1], headers);
     }
-    const res = db.lookupPrefix(prefix, page.cursor, page.limit);
+    const res = await db.lookupPrefix(prefix, page.cursor, page.limit);
     if (res && res.tooBroad) {
       return errorResponse(
         422,
