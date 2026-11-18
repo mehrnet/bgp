@@ -22,7 +22,7 @@ const SOURCES: &[SourceDef] = &[
     },
     SourceDef {
         name: "geofeed",
-        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, NULL, country, NULL, NULL, NULL, region, city, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, latitude, longitude, is_fallback FROM geolocations WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
+        query: "SELECT rowid, start_ip_sort, end_ip_sort, ip_version, NULL, country, NULL, NULL, NULL, region, city, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, latitude, longitude, is_fallback FROM geolocations WHERE is_fallback = 0 AND rowid > ?1 ORDER BY rowid LIMIT ?2",
     },
 ];
 
