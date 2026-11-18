@@ -2,9 +2,11 @@ use serde::Serialize;
 
 use crate::sweep::Segment;
 
-pub const DEFAULT_BLOCK_SIZE: u8 = 64;
+pub const DEFAULT_BLOCK_SIZE: u8 = 128;
 pub const DEFAULT_ALLOC_V4_BITS: u8 = 32;
 pub const DEFAULT_ALLOC_V6_BITS: u8 = 64;
+pub const DEFAULT_GEO_V4_BITS: u8 = 32;
+pub const DEFAULT_GEO_V6_BITS: u8 = 64;
 pub const DEFAULT_ROUTE_V4_BITS: u8 = 32;
 pub const DEFAULT_ROUTE_V6_BITS: u8 = 64;
 
@@ -73,12 +75,15 @@ pub struct LiteBuildOptions {
     pub include_asn_routes: bool,
     pub alloc_v4_bits: u8,
     pub alloc_v6_bits: u8,
+    pub geo_v4_bits: u8,
+    pub geo_v6_bits: u8,
 }
 
 pub(crate) struct RouteTables {
     pub(crate) segs4: Vec<Segment>,
     pub(crate) segs6: Vec<Segment>,
     pub(crate) multi_sets: Vec<Vec<u32>>,
+    pub(crate) route_val_table: Vec<u32>,
 }
 
 pub(crate) struct EncodeInput<'a> {

@@ -2,6 +2,7 @@ pub mod cli;
 pub mod country_db;
 pub mod country_reader;
 pub mod freq_dict;
+pub(crate) mod lite_chunk;
 pub mod lite_db;
 pub mod lite_encode;
 pub(crate) mod lite_routes;

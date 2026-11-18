@@ -6,7 +6,8 @@ use bgp_compact::country_db::{
 use bgp_compact::country_reader::CountryDb;
 use bgp_compact::lite_db::LiteDbBuilder;
 use bgp_compact::lite_types::{
-    AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, LiteBuildOptions, LiteMetadata,
+    AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, DEFAULT_GEO_V4_BITS,
+    DEFAULT_GEO_V6_BITS, LiteBuildOptions, LiteMetadata,
 };
 
 fn ip(s: &str) -> Result<IpAddr, std::net::AddrParseError> {
@@ -64,6 +65,8 @@ fn lite_db_encodes_valid_mnl1_header_and_tables() -> Result<(), Box<dyn std::err
         include_asn_routes: true,
         alloc_v4_bits: DEFAULT_ALLOC_V4_BITS,
         alloc_v6_bits: DEFAULT_ALLOC_V6_BITS,
+        geo_v4_bits: DEFAULT_GEO_V4_BITS,
+        geo_v6_bits: DEFAULT_GEO_V6_BITS,
     });
     assert!(b.add_autnum(AutnumInput {
         as_number: 13335,
@@ -79,9 +82,49 @@ fn lite_db_encodes_valid_mnl1_header_and_tables() -> Result<(), Box<dyn std::err
 
     let mut buf = Vec::new();
     let stats = b.encode(&mut buf)?;
-    assert_eq!(buf.get(..5), Some(&b"MNL1\x03"[..]));
+    assert_eq!(buf.get(..5), Some(&b"MNL1\x05"[..]));
+    assert_eq!(buf.get(5), Some(&0b0000_1111));
+    assert_eq!(buf.get(7..13), Some(&[32, 64, 32, 64, 32, 64][..]));
     assert_eq!(stats.autnums, 1);
     assert_eq!(stats.multi_asn_sets, 1);
     assert_eq!(stats.asn_route_items, 2);
+    Ok(())
+}
+
+#[test]
+fn lite_db_splits_alloc_and_geo_quantization() -> Result<(), Box<dyn std::error::Error>> {
+    let mut b = LiteDbBuilder::new(LiteBuildOptions {
+        metadata: LiteMetadata::default(),
+        include_asn_routes: false,
+        alloc_v4_bits: DEFAULT_ALLOC_V4_BITS,
+        alloc_v6_bits: DEFAULT_ALLOC_V6_BITS,
+        geo_v4_bits: 24,
+        geo_v6_bits: 48,
+    });
+    assert!(b.add_allocation(ip("1.1.2.0")?, ip("1.1.2.15")?, "APNIC", "JP"));
+    assert!(!b.add_geofeed(ip("1.1.2.0")?, ip("1.1.2.15")?, "JP", "Tokyo", "Tokyo"));
+    let mut buf = Vec::new();
+    let stats = b.encode(&mut buf)?;
+    assert_eq!(stats.alloc_v4_segs, 3);
+    assert_eq!(stats.geo_v4_segs, 1);
+    Ok(())
+}
+
+#[test]
+fn lite_db_rfc8805_overrides_narrower_fallback() -> Result<(), Box<dyn std::error::Error>> {
+    let mut b = LiteDbBuilder::new(LiteBuildOptions {
+        metadata: LiteMetadata::default(),
+        include_asn_routes: false,
+        alloc_v4_bits: DEFAULT_ALLOC_V4_BITS,
+        alloc_v6_bits: DEFAULT_ALLOC_V6_BITS,
+        geo_v4_bits: DEFAULT_GEO_V4_BITS,
+        geo_v6_bits: DEFAULT_GEO_V6_BITS,
+    });
+    assert!(b.add_geofeed_fallback(ip("1.1.1.0")?, ip("1.1.1.127")?, "DE", "Berlin", "Berlin"));
+    assert!(b.add_geofeed(ip("1.1.1.0")?, ip("1.1.1.255")?, "AU", "QLD", "Brisbane"));
+    let mut buf = Vec::new();
+    let stats = b.encode(&mut buf)?;
+    assert_eq!(stats.geo_v4_segs, 3);
+    assert_eq!(stats.geo_locations, 2);
     Ok(())
 }

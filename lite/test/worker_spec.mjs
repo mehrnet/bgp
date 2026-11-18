@@ -29,11 +29,16 @@ function padV6(valBig) {
 function buildFixtureDB() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bgp-lite-test-"));
   try {
+    const extraAutnums = [];
+    for (let asn = 65000; asn <= 65300; asn++) {
+      extraAutnums.push(`AS${asn},ripe,DE,NET-${asn},ORG-${asn},ASSIGNED,,,,RIPE,,`);
+    }
     fs.writeFileSync(
       path.join(tmp, "autnums.csv"),
       [
         "AS13335,arin,US,CLOUDFLARENET,ORG-CLOUD14-ARIN,ASSIGNED,,,ARIN,ARIN-HM,abuse@cloudflare.com,Cloudflare Inc.",
         "AS64512,ripe,DE,PRIV-NET,ORG-PRIV,ASSIGNED,,,,RIPE,,",
+        ...extraAutnums,
       ].join("\n") + "\n"
     );
     const v6Start = (0x2606n << 112n) | (0x4700n << 96n);
@@ -68,6 +73,7 @@ function buildFixtureDB() {
         `${padV4("1.1.1.0")},${padV4("1.1.1.255")},4,1.1.1.0/24,AS13335,apnic,,,,,`,
         `${padV4("1.1.2.0")},${padV4("1.1.2.255")},4,1.1.2.0/24,AS13335,apnic,,,,,`,
         `${padV4("1.1.2.0")},${padV4("1.1.2.255")},4,1.1.2.0/24,AS64512,ripe,,,,,`,
+        `${padV4("1.1.2.128")},${padV4("1.1.2.255")},4,1.1.2.128/25,AS65300,ripe,,,,,`,
         `${padV4("2.0.0.0")},${padV4("2.0.0.255")},4,2.0.0.0/24,AS13335,ripe,,,,,`,
         `${padV4("2.0.1.0")},${padV4("2.0.1.255")},4,2.0.1.0/24,AS13335,ripe,,,,,`,
         `${padV6(v6Start)},${padV6(v6End)},6,2606:4700::/32,AS13335,arin,,,,,`,
@@ -109,7 +115,7 @@ const db = buildFixtureDB();
 
 async function call(pathAndQuery, init = {}) {
   const req = new Request(`https://bgp-lite.mehrnet.com${pathAndQuery}`, init);
-  const res = handleRequest(db, req, {});
+  const res = await handleRequest(db, req, {});
   const text = await res.text();
   return { status: res.status, headers: res.headers, text, json: () => JSON.parse(text) };
 }
@@ -202,6 +208,15 @@ test("v1/asn and v1/prefix", async () => {
   assert.equal(pb.prefix.cidr, "1.1.0.0/16");
   assert.equal(pb.allocation.country_code, "AU");
   assert.ok(pb.routes.items.length >= 3);
+
+  // Chunk > 0 ASN + unaligned /25 shifted-delta route
+  const aChunk1 = await call("/v1/asn?query=AS65300");
+  assert.equal(aChunk1.status, 200);
+  assert.equal(aChunk1.json().autnum.name, "NET-65300");
+  assert.equal(aChunk1.json().routes.items[0].prefix, "1.1.2.128/25");
+  const rUnaligned = await call("/v1/ip?query=1.1.2.200");
+  assert.equal(rUnaligned.json().network.cidr, "1.1.2.128/25");
+  assert.equal(rUnaligned.json().network.origins[0].name, "NET-65300");
 });
 
 test("validation and 404 errors match contract", async () => {

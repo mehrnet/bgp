@@ -289,11 +289,14 @@ jobs:
           cat artifacts/routes_*.csv > final_data/routes.csv
           cat artifacts/autnums_*.csv > final_data/autnums.csv
           test -s final_data/geolocations.csv
+          curl -fsSL --retry 3 "https://cdn.jsdelivr.net/npm/dbip-city-lite/dbip-city-lite.mmdb.gz" -o final_data/dbip-city-lite.mmdb.gz
+          test -s final_data/dbip-city-lite.mmdb.gz
           cargo test -p bgp-compact
           npm --prefix lite test
           cargo build -p bgp-tools --release --bin build-lite-db
           ./target/release/build-lite-db \
             -input final_data \
+            -dbip final_data/dbip-city-lite.mmdb.gz \
             -output lite/bgp-lite.mnl \
             -release-tag "$RELEASE_TAG" \
             -built-at "$DATASET_BUILT_AT" \
@@ -423,7 +426,7 @@ jobs:
           - `mehrnet_bgp_mmap.tar.zst` contains the ready-to-query zero-copy mmap database. No import or index build is required on the API server.
           - `mehrnet_bgp_sqlite.tar.zst` contains the ready-to-query SQLite database for third-party users and offline inspection.
           - `country.mncc` is a tiny IP-to-country-code database (MNCC format) for bundling into clients; see `docs/country-database.md`.
-          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`lite/`).
+          - `bgp-lite.mnl` is the compact read-only dataset bundled into the standalone `bgp-lite` Cloudflare Worker (`lite/`). Fallback geolocation data includes IP Geolocation by [DB-IP](https://db-ip.com) (CC BY 4.0).
           - `bgp-api-linux-amd64.tar.gz` and `bgp-api-linux-arm64.tar.gz` contain statically linked API binaries.
           - `SHA256SUMS.txt` verifies every downloadable payload.
           EOF

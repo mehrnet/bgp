@@ -5,10 +5,13 @@ use std::net::IpAddr;
 use crate::freq_dict::FreqDict;
 use crate::lite_encode::encode_mnl1;
 use crate::lite_routes::{CompactDicts, build_route_segments, remap_allocs, remap_geos};
-use crate::lite_tables::{push_asn_route, push_interval, push_unique};
+use crate::lite_tables::{
+    FALLBACK_PRIORITY_BIAS, insert_geofeed, push_asn_route, push_interval, push_unique,
+};
 use crate::lite_types::{
-    AsnRoute, AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, DEFAULT_ROUTE_V6_BITS,
-    EncodeInput, GeoLocKey, LiteBuildOptions, LiteStats,
+    AsnRoute, AutnumInput, DEFAULT_ALLOC_V4_BITS, DEFAULT_ALLOC_V6_BITS, DEFAULT_GEO_V4_BITS,
+    DEFAULT_GEO_V6_BITS, DEFAULT_ROUTE_V6_BITS, EncodeInput, GeoLocKey, LiteBuildOptions,
+    LiteStats,
 };
 use crate::sortkey::{normalize_country, slot_range, unmap_ip};
 use crate::sweep::{Interval, flatten_intervals};
@@ -45,6 +48,12 @@ impl LiteDbBuilder {
         }
         if opts.alloc_v6_bits == 0 {
             opts.alloc_v6_bits = DEFAULT_ALLOC_V6_BITS;
+        }
+        if opts.geo_v4_bits == 0 {
+            opts.geo_v4_bits = DEFAULT_GEO_V4_BITS;
+        }
+        if opts.geo_v6_bits == 0 {
+            opts.geo_v6_bits = DEFAULT_GEO_V6_BITS;
         }
         Self {
             opts,
@@ -118,7 +127,7 @@ impl LiteDbBuilder {
         }
         let val = (self.registries.id(&reg) << 16) | self.countries.id(&cc);
         self.seq += 1;
-        push_interval(self, fam, lo, hi, val, true);
+        push_interval(self, fam, (lo, hi), val, true, 0);
         true
     }
 
@@ -130,36 +139,23 @@ impl LiteDbBuilder {
         region: &str,
         city: &str,
     ) -> bool {
-        let cc = normalize_country(country).unwrap_or_default();
-        let (reg, cty) = (region.trim().to_owned(), city.trim().to_owned());
-        if cc.is_empty() && reg.is_empty() && cty.is_empty() {
-            return false;
-        }
-        let (fam, lo, hi, ok) =
-            slot_range(start, end, self.opts.alloc_v4_bits, self.opts.alloc_v6_bits);
-        if !ok {
-            return false;
-        }
-        let key = GeoLocKey {
-            cc_id: self.countries.id(&cc),
-            reg_id: self.regions.id(&reg),
-            city_id: self.cities.id(&cty),
-        };
-        let loc_id = if let Some(&id) = self.geo_loc_map.get(&key) {
-            if let Some(slot) = self.geo_loc_freq.get_mut(id as usize) {
-                *slot += 1;
-            }
-            id
-        } else {
-            let id = self.geo_loc_list.len() as u32;
-            self.geo_loc_map.insert(key, id);
-            self.geo_loc_list.push(key);
-            self.geo_loc_freq.push(1);
-            id
-        };
-        self.seq += 1;
-        push_interval(self, fam, lo, hi, loc_id, false);
-        true
+        insert_geofeed(self, (start, end), (country, region, city), 0)
+    }
+
+    pub fn add_geofeed_fallback(
+        &mut self,
+        start: IpAddr,
+        end: IpAddr,
+        country: &str,
+        region: &str,
+        city: &str,
+    ) -> bool {
+        insert_geofeed(
+            self,
+            (start, end),
+            (country, region, city),
+            FALLBACK_PRIORITY_BIAS,
+        )
     }
 
     pub fn add_route(&mut self, net_ip: IpAddr, bits: u8, as_number: u32) -> bool {
@@ -212,12 +208,12 @@ impl LiteDbBuilder {
             ),
             flatten_intervals(
                 std::mem::take(&mut self.geo_v4),
-                self.opts.alloc_v4_bits,
+                self.opts.geo_v4_bits,
                 None,
             ),
             flatten_intervals(
                 std::mem::take(&mut self.geo_v6),
-                self.opts.alloc_v6_bits,
+                self.opts.geo_v6_bits,
                 None,
             ),
         );

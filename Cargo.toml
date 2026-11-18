@@ -38,6 +38,8 @@ flate2 = "1"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["http1", "http2", "server", "client"] }
 hyper-util = { version = "0.1", features = ["http1", "http2", "server", "client", "tokio"] }
+ipnetwork = "0.20"
+maxminddb = "0.24"
 memmap2 = "0.9"
 rusqlite = { version = "0.32", features = ["bundled"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
