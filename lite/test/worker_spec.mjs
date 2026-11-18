@@ -67,6 +67,13 @@ function buildFixtureDB() {
       ].join("\n") + "\n"
     );
     fs.writeFileSync(
+      path.join(tmp, "geolocations_fallback.csv"),
+      [
+        `${padV4("1.1.1.128")},${padV4("1.1.1.255")},4,DE,Berlin,Berlin,52.52,13.405`,
+        `${padV4("2.0.1.0")},${padV4("2.0.1.255")},4,IR,Tehran,Tehran (District 7),35.7425,51.4402`,
+      ].join("\n") + "\n"
+    );
+    fs.writeFileSync(
       path.join(tmp, "routes.csv"),
       [
         `${padV4("1.1.0.0")},${padV4("1.1.255.255")},4,1.1.0.0/16,AS64512,ripe,,,,,`,
@@ -147,7 +154,14 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b1.location.country_code, "US");
   assert.equal(b1.location.region, "US-CA");
   assert.equal(b1.location.city, "Los Angeles");
+  assert.equal(b1.location.latitude, null);
+  assert.equal(b1.location.longitude, null);
   assert.deepEqual(b1.sources, { allocation: true, route: true, geofeed: true });
+
+  // RFC 8805 must override narrower fallback without mixing coordinates
+  const rOverride = (await call("/v1/ip?query=1.1.1.200")).json();
+  assert.equal(rOverride.location.city, "Los Angeles");
+  assert.equal(rOverride.location.latitude, null);
 
   // Multi-origin
   const r2 = await call("/v1/ip?query=1.1.2.9");
@@ -166,9 +180,14 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   const r6Sub = (await call("/v1/ip?query=2606:4700:4700:1::42")).json();
   assert.equal(r6Sub.allocation.country_code, "CA");
 
-  // Sibling /24 must not collapse
+  // Sibling /24 must not collapse + fallback coordinates
   const r3 = await call("/v1/ip?query=2.0.1.42");
-  assert.equal(r3.json().network.cidr, "2.0.1.0/24");
+  const b3 = r3.json();
+  assert.equal(b3.network.cidr, "2.0.1.0/24");
+  assert.equal(b3.location.country_code, "IR");
+  assert.equal(b3.location.city, "Tehran (District 7)");
+  assert.equal(b3.location.latitude, 35.7425);
+  assert.equal(b3.location.longitude, 51.4402);
 
   // IPv6
   const r6 = await call("/v1/ip?query=2606:4700:4700::1");

@@ -1,8 +1,9 @@
 use std::io::Write;
 
+use crate::lite_chunk::write_asn_routes;
 use crate::lite_db::LiteDbBuilder;
 use crate::lite_routes::CompactDicts;
-use crate::lite_tables::{write_asn_routes, write_dicts, write_offset_data, write_seg_sections};
+use crate::lite_tables::{write_dicts, write_offset_data, write_seg_sections};
 use crate::lite_types::{
     AutnumInput, DEFAULT_BLOCK_SIZE, DEFAULT_ROUTE_V4_BITS, DEFAULT_ROUTE_V6_BITS, EncodeInput,
     GeoLocKey, LiteBuildOptions, LiteStats,
@@ -10,7 +11,7 @@ use crate::lite_types::{
 use crate::sweep::write_uvarint;
 
 const MAGIC: &[u8; 4] = b"MNL1";
-const FORMAT_VERSION: u8 = 6;
+const FORMAT_VERSION: u8 = 7;
 const FLAG_HAS_ASN_ROUTES: u8 = 1 << 0;
 const FLAG_SHIFTED_DELTAS: u8 = 1 << 1;
 const FLAG_CHUNKED_DEFLATE: u8 = 1 << 2;
@@ -66,9 +67,14 @@ fn write_geolocs(buf: &mut Vec<u8>, locs: &[GeoLocKey]) {
     let mut offsets = Vec::with_capacity(locs.len() + 1);
     for loc in locs {
         offsets.push(data.len() as u32);
-        write_uvarint(&mut data, u64::from(loc.cc_id));
+        let cc_tag = (loc.cc_id << 1) | u32::from(loc.coords.is_some());
+        write_uvarint(&mut data, u64::from(cc_tag));
         write_uvarint(&mut data, u64::from(loc.reg_id));
         write_uvarint(&mut data, u64::from(loc.city_id));
+        if let Some((lat_e6, lon_e6)) = loc.coords {
+            data.extend_from_slice(&lat_e6.to_le_bytes());
+            data.extend_from_slice(&lon_e6.to_le_bytes());
+        }
     }
     offsets.push(data.len() as u32);
     write_offset_data(buf, &offsets, &data);

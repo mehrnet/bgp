@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::io::Write;
 
 use flate2::{Compression, write::DeflateEncoder};
 
+use crate::lite_types::{AsnRoute, LiteBuildOptions};
 use crate::sweep::{Segment, put_le_key, write_uvarint};
 
 pub(crate) const ASN_CHUNK_SIZE: usize = 256;
@@ -124,4 +126,46 @@ where
     enc.write_all(&body)
         .map_err(|e| format!("deflate chunk body: {e}"))?;
     enc.finish().map_err(|e| format!("finish chunk: {e}"))
+}
+
+pub(crate) fn write_asn_routes(
+    buf: &mut Vec<u8>,
+    opts: &LiteBuildOptions,
+    asns: &[u32],
+    asn_routes: &HashMap<u32, Vec<AsnRoute>>,
+) -> Result<usize, String> {
+    if !opts.include_asn_routes {
+        return Ok(0);
+    }
+    let mut total = 0usize;
+    write_chunked_records(buf, asns.len(), ASN_CHUNK_SIZE, |idx, data| {
+        let Some(&asn) = asns.get(idx) else {
+            return;
+        };
+        let dedup = dedup_sort_routes(asn_routes.get(&asn).map_or(&[], Vec::as_slice));
+        total += dedup.len();
+        for r in dedup {
+            let nbytes = usize::from(r.bits).div_ceil(8);
+            data.push(if r.is_v6 { 128 + r.bits } else { r.bits });
+            if let Some(slice) = r.prefix.get(..nbytes) {
+                data.extend_from_slice(slice);
+            }
+        }
+    })?;
+    Ok(total)
+}
+
+fn dedup_sort_routes(raw: &[AsnRoute]) -> Vec<AsnRoute> {
+    let mut v = raw.to_vec();
+    v.sort_by(|a, b| {
+        a.is_v6
+            .cmp(&b.is_v6)
+            .then_with(|| a.key_hi.cmp(&b.key_hi))
+            .then_with(|| a.key_lo.cmp(&b.key_lo))
+            .then_with(|| a.bits.cmp(&b.bits))
+    });
+    v.dedup_by(|a, b| {
+        a.is_v6 == b.is_v6 && a.key_hi == b.key_hi && a.key_lo == b.key_lo && a.bits == b.bits
+    });
+    v
 }

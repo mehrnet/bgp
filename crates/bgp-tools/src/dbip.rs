@@ -48,7 +48,13 @@ pub fn for_each_dbip_city(
 pub fn load_dbip_fallback(path: &Path, builder: &mut LiteDbBuilder) -> Result<usize, String> {
     let mut added = 0usize;
     for_each_dbip_city(path, |rec| {
-        if builder.add_geofeed_fallback(rec.start, rec.end, rec.country, rec.region, rec.city) {
+        let coords = rec.latitude.zip(rec.longitude);
+        if builder.add_geofeed_with_coords(
+            (rec.start, rec.end),
+            (rec.country, rec.region, rec.city),
+            coords,
+            true,
+        ) {
             added += 1;
         }
         Ok(())

@@ -141,7 +141,7 @@ export class LiteDB {
       bytes[2] !== 0x4c || // L
       bytes[3] !== 0x31 || // 1
       ver < 3 ||
-      ver > 6
+      ver > 7
     ) {
       throw new Error("invalid MNL1 header");
     }
@@ -565,8 +565,9 @@ export class LiteDB {
         const idx = locID - 1;
         const off = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + idx * 4, true);
         const end = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + (idx + 1) * 4, true);
-        const ccId = readUv(this.bytes, off, end);
-        if (ccId >= 0) {
+        const ccRaw = readUv(this.bytes, off, end);
+        if (ccRaw >= 0) {
+          const ccId = this.version >= 7 ? ccRaw >>> 1 : ccRaw;
           const cc = this.countryAt(ccId);
           if (cc) return cc;
         }
@@ -629,6 +630,8 @@ export class LiteDB {
     let geoCC = null;
     let geoRegion = null;
     let geoCity = null;
+    let geoLat = null;
+    let geoLon = null;
     const geoSeg = isV6
       ? this.findSeg(geoTable, geoKey, skipGeo)
       : this.findSeg4(geoTable, geoKey, skipGeo);
@@ -638,14 +641,20 @@ export class LiteDB {
         const idx = locID - 1;
         const off = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + idx * 4, true);
         const end = this.geoLocDataOff + this.view.getUint32(this.geoLocOffsetsOff + (idx + 1) * 4, true);
-        const ccId = readUv(this.bytes, off, end);
-        const regId = ccId >= 0 ? readUv(this.bytes, _uvNext, end) : -1;
+        const ccRaw = readUv(this.bytes, off, end);
+        const ccId = this.version >= 7 ? ccRaw >>> 1 : ccRaw;
+        const hasCoords = this.version >= 7 && ccRaw >= 0 && (ccRaw & 1) !== 0;
+        const regId = ccRaw >= 0 ? readUv(this.bytes, _uvNext, end) : -1;
         const cityId = regId >= 0 ? readUv(this.bytes, _uvNext, end) : -1;
         if (cityId >= 0) {
           hasGeo = true;
           geoCC = this.countryAt(ccId);
           geoRegion = this.dictAt(this.regions, regId);
           geoCity = this.dictAt(this.cities, cityId);
+          if (hasCoords && _uvNext + 8 <= end) {
+            geoLat = this.view.getInt32(_uvNext, true) / 1_000_000;
+            geoLon = this.view.getInt32(_uvNext + 4, true) / 1_000_000;
+          }
         }
       }
     }
@@ -717,8 +726,8 @@ export class LiteDB {
         country_code: geoCC || allocCC,
         region: geoRegion,
         city: geoCity,
-        latitude: null,
-        longitude: null,
+        latitude: geoLat,
+        longitude: geoLon,
       },
       sources: {
         allocation: hasAlloc,
