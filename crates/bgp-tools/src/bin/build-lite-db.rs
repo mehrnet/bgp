@@ -41,10 +41,7 @@ fn run() -> Result<(), String> {
     let output = args.get("output").unwrap_or("bgp-lite.mnl");
     let mut b = LiteDbBuilder::new(opts);
     let (ac, alc, gc, rc) = load_csvs(input, &mut b)?;
-    let dc = match args.get("dbip") {
-        Some(path) if !path.is_empty() => load_dbip_fallback(Path::new(path), &mut b)?,
-        _ => 0,
-    };
+    let dc = load_fallback(&args, input, &mut b)?;
     let tmp = format!("{output}.tmp");
     let mut file = File::create(&tmp).map_err(|e| format!("create {tmp}: {e}"))?;
     let stats = b.encode(&mut file)?;
@@ -70,6 +67,18 @@ fn run() -> Result<(), String> {
         stats.asn_route_items
     );
     Ok(())
+}
+
+fn load_fallback(args: &ParsedArgs, input: &Path, b: &mut LiteDbBuilder) -> Result<usize, String> {
+    if let Some(path) = args.get("dbip").filter(|p| !p.is_empty()) {
+        return load_dbip_fallback(Path::new(path), b);
+    }
+    let fb = input.join("geolocations_fallback.csv");
+    if fb.is_file() {
+        load_fallback_geofeeds(&fb, b)
+    } else {
+        Ok(0)
+    }
 }
 
 fn parse_options(args: &ParsedArgs) -> Result<LiteBuildOptions, String> {
@@ -166,6 +175,28 @@ fn load_geofeeds(path: &Path, b: &mut LiteDbBuilder) -> Result<usize, String> {
         }
     })?;
     Ok(gc)
+}
+
+fn load_fallback_geofeeds(path: &Path, b: &mut LiteDbBuilder) -> Result<usize, String> {
+    let mut fc = 0usize;
+    each_row(path, |r| {
+        if let (true, Some(s), Some(e)) = (
+            r.len() >= 6,
+            addr_from_sort_key(&col(r, 0), &col(r, 2)),
+            addr_from_sort_key(&col(r, 1), &col(r, 2)),
+        ) {
+            let coords = col(r, 6)
+                .trim()
+                .parse::<f64>()
+                .ok()
+                .zip(col(r, 7).trim().parse::<f64>().ok());
+            if b.add_geofeed_with_coords((s, e), (&col(r, 3), &col(r, 4), &col(r, 5)), coords, true)
+            {
+                fc += 1;
+            }
+        }
+    })?;
+    Ok(fc)
 }
 
 fn load_routes(path: &Path, b: &mut LiteDbBuilder) -> Result<usize, String> {

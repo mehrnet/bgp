@@ -39,6 +39,7 @@ pub(crate) struct GeoLocKey {
     pub(crate) cc_id: u32,
     pub(crate) reg_id: u32,
     pub(crate) city_id: u32,
+    pub(crate) coords: Option<(i32, i32)>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

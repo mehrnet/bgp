@@ -1,14 +1,11 @@
-use std::collections::HashMap;
 use std::net::IpAddr;
 
-use crate::lite_chunk::{
-    ASN_CHUNK_SIZE, SegTableSpec, delta_shift, encode_seg_table_shifted, write_chunked_records,
-};
+use crate::lite_chunk::{SegTableSpec, delta_shift, encode_seg_table_shifted};
 use crate::lite_db::LiteDbBuilder;
 use crate::lite_routes::CompactDicts;
 use crate::lite_types::{
     AsnRoute, DEFAULT_BLOCK_SIZE, DEFAULT_ROUTE_V4_BITS, DEFAULT_ROUTE_V6_BITS, EncodeInput,
-    GeoLocKey, LiteBuildOptions,
+    GeoLocKey,
 };
 use crate::sortkey::{normalize_country, slot_range};
 use crate::sweep::{Interval, Segment, write_uvarint};
@@ -47,10 +44,26 @@ pub(crate) fn push_interval(
     }
 }
 
+pub(crate) fn encode_coords(coords: Option<(f64, f64)>) -> Option<(i32, i32)> {
+    let (lat, lon) = coords?;
+    if !lat.is_finite()
+        || !lon.is_finite()
+        || !(-90.0..=90.0).contains(&lat)
+        || !(-180.0..=180.0).contains(&lon)
+    {
+        return None;
+    }
+    Some((
+        (lat * 1_000_000.0).round() as i32,
+        (lon * 1_000_000.0).round() as i32,
+    ))
+}
+
 pub(crate) fn insert_geofeed(
     b: &mut LiteDbBuilder,
     bounds: (IpAddr, IpAddr),
     fields: (&str, &str, &str),
+    coords: Option<(f64, f64)>,
     priority_bias: i64,
 ) -> bool {
     let cc = normalize_country(fields.0).unwrap_or_default();
@@ -66,6 +79,7 @@ pub(crate) fn insert_geofeed(
         cc_id: b.countries.id(&cc),
         reg_id: b.regions.id(&reg),
         city_id: b.cities.id(&cty),
+        coords: encode_coords(coords),
     };
     let loc_id = if let Some(&id) = b.geo_loc_map.get(&key) {
         if let Some(slot) = b.geo_loc_freq.get_mut(id as usize) {
@@ -188,51 +202,9 @@ pub(crate) fn write_seg_sections(
     );
 }
 
-pub(crate) fn write_asn_routes(
-    buf: &mut Vec<u8>,
-    opts: &LiteBuildOptions,
-    asns: &[u32],
-    asn_routes: &HashMap<u32, Vec<AsnRoute>>,
-) -> Result<usize, String> {
-    if !opts.include_asn_routes {
-        return Ok(0);
-    }
-    let mut total = 0usize;
-    write_chunked_records(buf, asns.len(), ASN_CHUNK_SIZE, |idx, data| {
-        let Some(&asn) = asns.get(idx) else {
-            return;
-        };
-        let dedup = dedup_sort_routes(asn_routes.get(&asn).map_or(&[], Vec::as_slice));
-        total += dedup.len();
-        for r in dedup {
-            let nbytes = usize::from(r.bits).div_ceil(8);
-            data.push(if r.is_v6 { 128 + r.bits } else { r.bits });
-            if let Some(slice) = r.prefix.get(..nbytes) {
-                data.extend_from_slice(slice);
-            }
-        }
-    })?;
-    Ok(total)
-}
-
 pub(crate) fn write_offset_data(buf: &mut Vec<u8>, offsets: &[u32], data: &[u8]) {
     for &off in offsets {
         buf.extend_from_slice(&off.to_le_bytes());
     }
     buf.extend_from_slice(data);
-}
-
-fn dedup_sort_routes(raw: &[AsnRoute]) -> Vec<AsnRoute> {
-    let mut v = raw.to_vec();
-    v.sort_by(|a, b| {
-        a.is_v6
-            .cmp(&b.is_v6)
-            .then_with(|| a.key_hi.cmp(&b.key_hi))
-            .then_with(|| a.key_lo.cmp(&b.key_lo))
-            .then_with(|| a.bits.cmp(&b.bits))
-    });
-    v.dedup_by(|a, b| {
-        a.is_v6 == b.is_v6 && a.key_hi == b.key_hi && a.key_lo == b.key_lo && a.bits == b.bits
-    });
-    v
 }

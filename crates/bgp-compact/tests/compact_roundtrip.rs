@@ -90,7 +90,7 @@ fn lite_db_encodes_valid_mnl1_header_and_tables() -> Result<(), Box<dyn std::err
                 b'N',
                 b'L',
                 b'1',
-                6,
+                7,
                 0b0000_1111,
                 64,
                 32,
@@ -137,7 +137,12 @@ fn lite_db_rfc8805_overrides_narrower_fallback() -> Result<(), Box<dyn std::erro
         geo_v4_bits: DEFAULT_GEO_V4_BITS,
         geo_v6_bits: DEFAULT_GEO_V6_BITS,
     });
-    assert!(b.add_geofeed_fallback(ip("1.1.1.0")?, ip("1.1.1.127")?, "DE", "Berlin", "Berlin"));
+    assert!(b.add_geofeed_with_coords(
+        (ip("1.1.1.0")?, ip("1.1.1.127")?),
+        ("DE", "Berlin", "Berlin"),
+        Some((52.52, 13.405)),
+        true,
+    ));
     assert!(b.add_geofeed(ip("1.1.1.0")?, ip("1.1.1.255")?, "AU", "QLD", "Brisbane"));
     let mut buf = Vec::new();
     let stats = b.encode(&mut buf)?;

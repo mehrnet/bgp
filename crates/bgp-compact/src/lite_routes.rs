@@ -79,6 +79,7 @@ fn compact_geolocs(
                 cc_id: country_map.get(orig.cc_id as usize).copied().unwrap_or(0),
                 reg_id: region_map.get(orig.reg_id as usize).copied().unwrap_or(0),
                 city_id: city_map.get(orig.city_id as usize).copied().unwrap_or(0),
+                coords: orig.coords,
             });
         }
     }

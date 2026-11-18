@@ -71,6 +71,7 @@ impl LiteDbBuilder {
                 cc_id: 0,
                 reg_id: 0,
                 city_id: 0,
+                coords: None,
             }],
             geo_loc_freq: vec![0],
             alloc_v4: Vec::new(),
@@ -139,7 +140,7 @@ impl LiteDbBuilder {
         region: &str,
         city: &str,
     ) -> bool {
-        insert_geofeed(self, (start, end), (country, region, city), 0)
+        insert_geofeed(self, (start, end), (country, region, city), None, 0)
     }
 
     pub fn add_geofeed_fallback(
@@ -150,12 +151,18 @@ impl LiteDbBuilder {
         region: &str,
         city: &str,
     ) -> bool {
-        insert_geofeed(
-            self,
-            (start, end),
-            (country, region, city),
-            FALLBACK_PRIORITY_BIAS,
-        )
+        self.add_geofeed_with_coords((start, end), (country, region, city), None, true)
+    }
+
+    pub fn add_geofeed_with_coords(
+        &mut self,
+        bounds: (IpAddr, IpAddr),
+        fields: (&str, &str, &str),
+        coords: Option<(f64, f64)>,
+        fallback: bool,
+    ) -> bool {
+        let bias = if fallback { FALLBACK_PRIORITY_BIAS } else { 0 };
+        insert_geofeed(self, bounds, fields, coords, bias)
     }
 
     pub fn add_route(&mut self, net_ip: IpAddr, bits: u8, as_number: u32) -> bool {
