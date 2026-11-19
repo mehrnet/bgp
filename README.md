@@ -86,7 +86,7 @@ Rust 1.88+ (`edition = "2024"`) and Node.js 24+:
 ```sh
 shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
-npm --prefix lite test
+npm --prefix lite run typecheck && npm --prefix lite test
 npm --prefix web run check && npm --prefix web test && npm --prefix web run build
 ```
 

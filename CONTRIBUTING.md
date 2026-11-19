@@ -22,7 +22,8 @@ Before committing any change, run from the repository root:
 ```sh
 shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
-npm --prefix lite test
+npm --prefix lite run typecheck && npm --prefix lite test
+npm --prefix web run check && npm --prefix web test
 ```
 
-This runs shell script linting, line-count enforcement, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and all Rust and Cloudflare Worker tests.
+This runs shell script linting, line-count enforcement, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, Rust tests, TypeScript checks, and Cloudflare Worker tests.

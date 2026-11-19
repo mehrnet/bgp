@@ -24,8 +24,11 @@ jobs:
         run: shellcheck install.sh scripts/*.sh
       - name: Run Rust quality gate (line limits, fmt, clippy, unit tests)
         run: ./scripts/check-quality.sh
-      - name: Run bgp-lite worker tests
-        run: npm --prefix lite test
+      - name: Typecheck and test bgp-lite worker
+        run: |
+          npm --prefix lite ci
+          npm --prefix lite run typecheck
+          npm --prefix lite test
       - name: Check, test, and build web UI
         run: |
           npm --prefix web ci

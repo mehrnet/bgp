@@ -1,35 +1,36 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import test from "node:test";
 import { fileURLToPath } from "node:url";
-
-import { LiteDB } from "../src/mnl1.js";
-import { handleRequest } from "../src/handler.js";
+import { handleRequest } from "../src/handler.ts";
+import { LiteDB } from "../src/mnl1.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 
-function padV4(ip) {
+function padV4(ip: string): string {
   const parts = ip.split(".").map(Number);
-  const v = ((0xffffn << 32n) |
-    (BigInt(parts[0]) << 24n) |
-    (BigInt(parts[1]) << 16n) |
-    (BigInt(parts[2]) << 8n) |
-    BigInt(parts[3])).toString();
+  const v = (
+    (0xffffn << 32n) |
+    (BigInt(parts[0] ?? 0) << 24n) |
+    (BigInt(parts[1] ?? 0) << 16n) |
+    (BigInt(parts[2] ?? 0) << 8n) |
+    BigInt(parts[3] ?? 0)
+  ).toString();
   return v.padStart(39, "0");
 }
 
-function padV6(valBig) {
+function padV6(valBig: bigint): string {
   return valBig.toString().padStart(39, "0");
 }
 
-function buildFixtureDB() {
+function buildFixtureDB(): LiteDB {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bgp-lite-test-"));
   try {
-    const extraAutnums = [];
+    const extraAutnums: string[] = [];
     for (let asn = 65000; asn <= 65300; asn++) {
       extraAutnums.push(`AS${asn},ripe,DE,NET-${asn},ORG-${asn},ASSIGNED,,,,RIPE,,`);
     }
@@ -45,7 +46,6 @@ function buildFixtureDB() {
     const v6End = v6Start | ((1n << 96n) - 1n);
     const v6SubStart = v6Start | (0x4700n << 80n);
     const v6SubEnd = v6SubStart | ((1n << 80n) - 1n);
-
     const v6Sub64Start = v6SubStart | (1n << 64n);
     const v6Sub64End = v6Sub64Start | ((1n << 64n) - 1n);
 
@@ -95,27 +95,14 @@ function buildFixtureDB() {
     execFileSync(
       "cargo",
       [
-        "run",
-        "--quiet",
-        "-p",
-        "bgp-tools",
-        "--bin",
-        "build-lite-db",
-        "--",
-        "-input",
-        tmp,
-        "-output",
-        out,
-        "-release-tag",
-        "db-test-1",
-        "-built-at",
-        "2026-11-17T10:00:00Z",
-        "-source-commit",
-        "deadbeef",
+        "run", "--quiet", "-p", "bgp-tools", "--bin", "build-lite-db", "--",
+        "-input", tmp, "-output", out,
+        "-release-tag", "db-test-1", "-built-at", "2026-11-17T10:00:00Z", "-source-commit", "deadbeef",
       ],
       { cwd: repoRoot, env: { ...process.env, TMPDIR: "/var/tmp" } }
     );
-    return new LiteDB(fs.readFileSync(out));
+    const buf = fs.readFileSync(out);
+    return new LiteDB(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -123,11 +110,11 @@ function buildFixtureDB() {
 
 const db = buildFixtureDB();
 
-async function call(pathAndQuery, init = {}) {
+async function call(pathAndQuery: string, init: RequestInit = {}) {
   const req = new Request(`https://bgp-lite.mehrnet.com${pathAndQuery}`, init);
   const res = await handleRequest(db, req, {});
   const text = await res.text();
-  return { status: res.status, headers: res.headers, text, json: () => JSON.parse(text) };
+  return { status: res.status, headers: res.headers, text, json: () => JSON.parse(text) as Record<string, any> };
 }
 
 test("health and root endpoints", async () => {
@@ -153,6 +140,7 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b1.network.asn, "AS13335");
   assert.equal(b1.network.as_number, 13335);
   assert.equal(b1.network.origins[0].name, "CLOUDFLARENET");
+  assert.equal(b1.network.origins[0].organization, "ORG-CLOUD14-ARIN");
   assert.equal(b1.allocation.country_code, "AU");
   assert.equal(b1.location.country_code, "US");
   assert.equal(b1.location.region, "US-CA");
@@ -161,38 +149,30 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b1.location.longitude, null);
   assert.deepEqual(b1.sources, { allocation: true, route: true, geofeed: true });
 
-  // RFC 8805 must override narrower fallback without mixing coordinates
   const rOverride = (await call("/v1/ip?query=1.1.1.200")).json();
   assert.equal(rOverride.location.city, "Los Angeles");
   assert.equal(rOverride.location.latitude, null);
 
-  // Multi-origin
-  const r2 = await call("/v1/ip?query=1.1.2.9");
-  const b2 = r2.json();
+  const b2 = (await call("/v1/ip?query=1.1.2.9")).json();
   assert.equal(b2.network.asn, null);
   assert.equal(b2.network.as_number, null);
   assert.deepEqual(b2.network.asns, ["AS13335", "AS64512"]);
 
-  // Sub-/24 non-CIDR allocation
   const rSub = (await call("/v1/ip?query=1.1.2.15")).json();
   assert.equal(rSub.allocation.country_code, "JP");
   assert.equal(rSub.allocation.start_ip, "1.1.2.10");
   assert.equal(rSub.allocation.end_ip, "1.1.2.25");
 
-  // IPv6 /64 sub-allocation
   const r6Sub = (await call("/v1/ip?query=2606:4700:4700:1::42")).json();
   assert.equal(r6Sub.allocation.country_code, "CA");
 
-  // Sibling /24 must not collapse + fallback coordinates
-  const r3 = await call("/v1/ip?query=2.0.1.42");
-  const b3 = r3.json();
+  const b3 = (await call("/v1/ip?query=2.0.1.42")).json();
   assert.equal(b3.network.cidr, "2.0.1.0/24");
   assert.equal(b3.location.country_code, "IR");
   assert.equal(b3.location.city, "Tehran (District 7)");
   assert.equal(b3.location.latitude, 35.7425);
   assert.equal(b3.location.longitude, 51.4402);
 
-  // RFC 8805 backfill by (country, city), ignoring country mismatch
   const rBackfill = (await call("/v1/ip?query=2.0.2.42")).json();
   assert.equal(rBackfill.location.country_code, "DE");
   assert.equal(rBackfill.location.region, "DE-HE");
@@ -206,9 +186,7 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(rNoMix.location.latitude, null);
   assert.equal(rNoMix.location.longitude, null);
 
-  // IPv6
-  const r6 = await call("/v1/ip?query=2606:4700:4700::1");
-  const b6 = r6.json();
+  const b6 = (await call("/v1/ip?query=2606:4700:4700::1")).json();
   assert.equal(b6.version, 6);
   assert.equal(b6.network.cidr, "2606:4700:4700::/48");
   assert.equal(b6.network.asn, "AS64512");
@@ -216,21 +194,17 @@ test("v1/ip IPv4, IPv6, multi-origin, sibling /24, and v4-mapped", async () => {
   assert.equal(b6.location.region, "GB-ENG");
   assert.equal(b6.location.city, "London");
 
-  // IPv4-mapped IPv6
   const rm = await call("/v1/ip?query=::ffff:1.1.1.1");
   assert.equal(rm.json().ip, "1.1.1.1");
   assert.equal(rm.json().version, 4);
 
-  // Plain-text and fast-path country shortcuts
   const rc = await call("/v1/country?query=1.1.1.1");
   assert.equal(rc.status, 200);
   assert.equal(rc.headers.get("Cache-Control"), "public, max-age=3600, s-maxage=86400");
   assert.equal(rc.text.trim(), "US");
   assert.equal((await call("/v1/country?query=1.0.5.5")).text.trim(), "AU");
   assert.equal((await call("/v1/ip?query=1.1.1.1&format=text")).text.trim(), "US");
-  const rc6 = await call("/v1/country?query=2606:4700:4700::1&format=json");
-  assert.equal(rc6.json().country_code, "GB");
-  assert.equal(b1.network.origins[0].organization, "ORG-CLOUD14-ARIN");
+  assert.equal((await call("/v1/country?query=2606:4700:4700::1&format=json")).json().country_code, "GB");
 });
 
 test("v1/asn and v1/prefix", async () => {
@@ -266,11 +240,10 @@ test("v1/asn and v1/prefix", async () => {
   const p6 = await call("/v1/prefix?prefix=2606:4700:4700::/48");
   assert.equal(p6.status, 200);
   assert.deepEqual(
-    p6.json().routes.items.map((r) => r.origin_asn),
+    (p6.json().routes.items as { origin_asn: string }[]).map((r) => r.origin_asn),
     ["AS13335", "AS64512"]
   );
 
-  // Chunk > 0 ASN + unaligned /25 shifted-delta route
   const aChunk1 = await call("/v1/asn?query=AS65300");
   assert.equal(aChunk1.status, 200);
   assert.equal(aChunk1.json().autnum.name, "NET-65300");
