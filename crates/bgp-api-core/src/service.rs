@@ -177,28 +177,14 @@ fn build_lookup_response<'a>(
         sources: Default::default(),
         details: None,
     };
-    populate_network(
-        &mut resp,
-        parts.routes,
-        sorted_route_asns(parts.routes),
-        parts.origins,
-    );
+    let asns = parts.origins.iter().map(|o| o.asn.clone()).collect();
+    populate_network(&mut resp, parts.routes, asns, parts.origins);
     populate_allocation(&mut resp, parts.allocation);
     populate_location(&mut resp, parts.geofeed);
     resp.sources.allocation = has_alloc;
     resp.sources.route = has_route;
     resp.sources.geofeed = has_geo;
     resp
-}
-
-fn sorted_route_asns(routes: &[RouteRef<'_>]) -> Vec<String> {
-    let mut map: BTreeMap<(u32, String), ()> = BTreeMap::new();
-    for r in routes {
-        if let Some(name) = cow_upper(r.origin_asn.clone()) {
-            map.insert((r.as_number, name.into_owned()), ());
-        }
-    }
-    map.into_keys().map(|(_, name)| name).collect()
 }
 
 fn origin_identities<'a>(

@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use bgp_compact::city_coords::{CityCoordIndex, parse_coord_str};
+use bgp_compact::city_coords::{CityCoordIndex, csv_field, parse_coord_str};
 
 use rusqlite::types::Value;
 use rusqlite::{Connection, params};
@@ -209,12 +209,6 @@ fn valid_row(rec: &csv::ByteRecord, required: &[usize]) -> bool {
     })
 }
 
-fn field_text(rec: &csv::ByteRecord, idx: usize) -> String {
-    rec.get(idx)
-        .map(|b| String::from_utf8_lossy(b).trim().to_owned())
-        .unwrap_or_default()
-}
-
 fn row_values(
     rec: &csv::ByteRecord,
     fields: usize,
@@ -223,18 +217,18 @@ fn row_values(
 ) -> Vec<Value> {
     let coords = geo_fallback.map(|_| {
         let (lat, lon) = (
-            parse_coord_str(&field_text(rec, 6)),
-            parse_coord_str(&field_text(rec, 7)),
+            parse_coord_str(&csv_field(rec, 6)),
+            parse_coord_str(&csv_field(rec, 7)),
         );
         city_coords.map_or((lat, lon), |idx| {
-            idx.resolve(lat, lon, &field_text(rec, 3), &field_text(rec, 5))
+            idx.resolve(lat, lon, &csv_field(rec, 3), &csv_field(rec, 5))
         })
     });
     let mut vals: Vec<Value> = (0..fields)
         .map(|i| match (coords, i) {
             (Some((lat, _)), 6) => lat.map_or(Value::Null, Value::Real),
             (Some((_, lon)), 7) => lon.map_or(Value::Null, Value::Real),
-            _ => match field_text(rec, i) {
+            _ => match csv_field(rec, i) {
                 s if s.is_empty() => Value::Null,
                 s => Value::Text(s),
             },

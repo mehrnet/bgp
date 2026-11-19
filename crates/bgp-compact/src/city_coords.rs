@@ -70,8 +70,8 @@ impl CityCoordIndex {
         let Some(lon) = field_coord(rec, 7) else {
             return;
         };
-        let cc = field_str(rec, 3);
-        let city = field_str(rec, 5);
+        let cc = csv_field(rec, 3);
+        let city = csv_field(rec, 5);
         let Some(key) = city_coord_key(&cc, &city) else {
             return;
         };
@@ -131,7 +131,9 @@ impl CityCoordIndex {
     }
 }
 
-fn field_str(rec: &csv::ByteRecord, idx: usize) -> String {
+/// Trims and lossily decodes a CSV byte record column as UTF-8.
+#[must_use]
+pub fn csv_field(rec: &csv::ByteRecord, idx: usize) -> String {
     rec.get(idx)
         .map(|b| String::from_utf8_lossy(b).trim().to_owned())
         .unwrap_or_default()

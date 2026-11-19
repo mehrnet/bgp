@@ -105,21 +105,7 @@ This keeps planned dataset updates available without rebuilding indexes on the s
 If Caddy is unavailable, disk space is insufficient, or `BGP_API_BLUE_GREEN=0` is set,
 the updater falls back to stop-and-replace mode.
 
-Before staging, the updater records `MemAvailable` and the active process RSS. If
-available memory is below its reserve, it first verifies the active slot's authenticated
-health capability and then sends a compatible process `SIGUSR2`:
-it drops only its optional serialized-response caches, while continuing
-to answer directly from the `mmap` file. This creates room for the staged process without a traffic
-cutover. The replacement then completes its selected cache warmup before it accepts
-traffic, while the old process continues to answer. Only after that health check does
-Caddy move to the new slot; the prior slot remains a retry target through the drain
-period. Kernel page cache is left to Linux to reclaim; the updater never uses global
-`drop_caches`.
-
-Release downloads and archive extraction run at idle I/O priority and `nice 19`.
-The staged slot also receives the minimum systemd CPU and I/O weight while it
-warms. This keeps the active read-only API ahead of all multi-gigabyte staging
-work on small hosts.
+Before staging, the updater checks `MemAvailable` and signals the active slot (`SIGUSR2`) to shed optional response caches if memory is tight while continuing to serve from `mmap`. Kernel page cache is left to Linux to reclaim (never `drop_caches`). Downloads and extraction run at `ionice -c3 nice -n 19`, and the staged slot warms at minimum CPU/I/O weight.
 
 ### Logs and scheduled updates
 
@@ -247,15 +233,6 @@ The installer writes `/etc/bgp-api/bgp-api.env`:
 | `minimal` | Fallback when below `balanced` threshold: `64 MiB` compact cache, `16 MiB` resource cache, no preload |
 | `balanced` | Requires `selectors + 320 MiB caches + 512 MiB reserve`: `256 MiB` compact cache, `64 MiB` resource cache, warms the LPM selector slices in the kernel page cache |
 | `full` | Requires `database + 160 MiB caches + 768 MiB reserve`: `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable `mmap` file through the Linux page cache |
-
-`full` does not copy the database into process heap memory. It needs the dataset, response-cache
-budget, and a `768 MiB` operating-system reserve to fit at once, while the kernel
-can reclaim mapped pages under pressure.
-
-On ordinary startup the active server begins serving before its selected cache warms. During a
-blue-green update, however, the staged slot warms before its listener opens, while the current
-slot remains live. Caddy makes the warmed slot primary and retains the old slot as a retry target
-for the drain period. This avoids exposing the one-time selector copy to public requests.
 
 ## Releases and datasets
 

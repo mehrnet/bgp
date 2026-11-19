@@ -125,7 +125,7 @@ fn route_detail(v: RouteRef<'_>) -> LookupDetailRecord<'_> {
         start_ip: start.to_ip(v.version).to_string(),
         end_ip: end.to_ip(v.version).to_string(),
         version: v.version,
-        cidr: (!cidr.trim().is_empty()).then_some(cidr),
+        cidr: Some(cidr),
         as_number: as_number_from_asn(asn.as_deref()),
         asn,
         registry: cow_lower(v.registry),
@@ -169,7 +169,7 @@ pub(crate) fn populate_network<'a>(
         resp.network.as_number = as_number_from_asn(Some(single));
     }
     if let Some(route) = routes.first() {
-        resp.network.cidr = opt_trimmed(&route_cidr(route));
+        resp.network.cidr = Some(route_cidr(route));
         let (start, end) = route_bounds(route);
         resp.network.start_ip = Some(start.to_ip(route.version).to_string());
         resp.network.end_ip = Some(end.to_ip(route.version).to_string());

@@ -377,21 +377,18 @@ restore_caddy_upstreams() {
 
 reload_caddy() {
   local upstream="$1" fallback="$2"
-  local domain token
+  local domain token subcmd
   domain="$(env_value BGP_API_DOMAIN "$CADDY_ENV_FILE")"
   token="$(env_value ORIGIN_AUTH_TOKEN "$CADDY_ENV_FILE")"
   [ -n "$token" ] || token="$(env_value ORIGIN_AUTH_TOKEN "$PRIMARY_ENV_FILE")"
   [ -n "$token" ] || token="${ORIGIN_AUTH_TOKEN:-}"
-  BGP_API_DOMAIN="${domain:-bgp-api.mehrnet.com}" \
-    BGP_API_UPSTREAM="$upstream" \
-    BGP_API_FALLBACK_UPSTREAM="$fallback" \
-    ORIGIN_AUTH_TOKEN="$token" \
-    caddy validate --config "$CADDY_CONFIG" --adapter caddyfile >/dev/null
-  BGP_API_DOMAIN="${domain:-bgp-api.mehrnet.com}" \
-    BGP_API_UPSTREAM="$upstream" \
-    BGP_API_FALLBACK_UPSTREAM="$fallback" \
-    ORIGIN_AUTH_TOKEN="$token" \
-    caddy reload --config "$CADDY_CONFIG" --adapter caddyfile >/dev/null
+  for subcmd in validate reload; do
+    BGP_API_DOMAIN="${domain:-bgp-api.mehrnet.com}" \
+      BGP_API_UPSTREAM="$upstream" \
+      BGP_API_FALLBACK_UPSTREAM="$fallback" \
+      ORIGIN_AUTH_TOKEN="$token" \
+      caddy "$subcmd" --config "$CADDY_CONFIG" --adapter caddyfile >/dev/null
+  done
 }
 
 switch_caddy() {

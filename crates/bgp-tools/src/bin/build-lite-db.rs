@@ -3,6 +3,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::process;
 
+use bgp_compact::city_coords::parse_coord_str;
 use bgp_compact::cli::ParsedArgs;
 use bgp_compact::lite_db::LiteDbBuilder;
 use bgp_compact::lite_types::{
@@ -185,11 +186,7 @@ fn load_fallback_geofeeds(path: &Path, b: &mut LiteDbBuilder) -> Result<usize, S
             addr_from_sort_key(&col(r, 0), &col(r, 2)),
             addr_from_sort_key(&col(r, 1), &col(r, 2)),
         ) {
-            let coords = col(r, 6)
-                .trim()
-                .parse::<f64>()
-                .ok()
-                .zip(col(r, 7).trim().parse::<f64>().ok());
+            let coords = parse_coord_str(&col(r, 6)).zip(parse_coord_str(&col(r, 7)));
             if b.add_geofeed_with_coords((s, e), (&col(r, 3), &col(r, 4), &col(r, 5)), coords, true)
             {
                 fc += 1;

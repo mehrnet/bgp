@@ -159,6 +159,21 @@ package_manager() {
   return 1
 }
 
+pkg_install() {
+  local manager="$1"; shift
+  case "$manager" in
+    apt-get)
+      apt-get update
+      DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+      ;;
+    dnf|yum) "$manager" install -y "$@" ;;
+    pacman) pacman -Sy --noconfirm "$@" ;;
+    zypper) zypper --non-interactive install "$@" ;;
+    apk) apk add --no-cache "$@" ;;
+    *) return 1 ;;
+  esac
+}
+
 install_base_tools() {
   local command manager missing=false
   for command in awk curl date flock jq openssl sha256sum tar zstd; do
@@ -167,16 +182,7 @@ install_base_tools() {
   [ "$missing" = false ] && return
   manager="$(package_manager)" || die "install curl, jq, openssl, coreutils, tar, util-linux, and zstd, then retry"
   step "Installing required command-line tools"
-  case "$manager" in
-    apt-get)
-      apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl jq openssl coreutils tar util-linux zstd
-      ;;
-    dnf|yum) "$manager" install -y ca-certificates curl jq openssl coreutils tar util-linux zstd ;;
-    pacman) pacman -Sy --noconfirm ca-certificates curl jq openssl coreutils tar util-linux zstd ;;
-    zypper) zypper --non-interactive install ca-certificates curl jq openssl coreutils tar util-linux zstd ;;
-    apk) apk add --no-cache ca-certificates curl jq openssl coreutils tar util-linux zstd ;;
-  esac
+  pkg_install "$manager" ca-certificates curl jq openssl coreutils tar util-linux zstd
 }
 
 install_caddy_package() {
@@ -184,16 +190,7 @@ install_caddy_package() {
   command -v caddy >/dev/null 2>&1 && return
   manager="$(package_manager)" || die "Caddy is missing and no supported package manager was found"
   step "Installing Caddy"
-  case "$manager" in
-    apt-get)
-      apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
-      ;;
-    dnf|yum) "$manager" install -y caddy ;;
-    pacman) pacman -Sy --noconfirm caddy ;;
-    zypper) zypper --non-interactive install caddy ;;
-    apk) apk add --no-cache caddy ;;
-  esac
+  pkg_install "$manager" caddy
   command -v caddy >/dev/null 2>&1 || die "Caddy could not be installed automatically"
 }
 
@@ -236,16 +233,15 @@ configure_caddy() {
 }
 
 install_auto_update() {
-  local manager
+  local manager cron_pkg=""
   if ! command -v cron >/dev/null 2>&1 && ! command -v crond >/dev/null 2>&1; then
     manager="$(package_manager)" || die "a cron daemon is required for --auto-update"
     case "$manager" in
-      apt-get) DEBIAN_FRONTEND=noninteractive apt-get install -y cron ;;
-      dnf|yum) "$manager" install -y cronie ;;
-      pacman) pacman -Sy --noconfirm cronie ;;
-      zypper) zypper --non-interactive install cron ;;
-      apk) apk add --no-cache dcron ;;
+      apt-get|zypper) cron_pkg=cron ;;
+      dnf|yum|pacman) cron_pkg=cronie ;;
+      apk) cron_pkg=dcron ;;
     esac
+    pkg_install "$manager" "$cron_pkg"
   fi
   cat > "$CRON_FILE" <<'EOF'
 SHELL=/bin/sh
@@ -347,10 +343,12 @@ if [ "$DOMAIN_SET" = true ]; then
     origin_token="$(openssl rand -hex 32)"
   fi
 fi
-cat > "$ENV_FILE" <<EOF
-BGP_API_DATABASE_PATH=$DATA_DIR/primary.mmap
-BGP_API_PRIMARY_DATABASE_PATH=$DATA_DIR/primary.mmap
-LISTEN_ADDR=127.0.0.1:3102
+write_slot_env() {
+  local path="$1" slot_var="$2" db_file="$3" port="$4"
+  cat > "$path" <<EOF
+BGP_API_DATABASE_PATH=$DATA_DIR/$db_file
+BGP_API_${slot_var}_DATABASE_PATH=$DATA_DIR/$db_file
+LISTEN_ADDR=127.0.0.1:$port
 BGP_API_CACHE_STRATEGY=auto
 BGP_API_DEFER_CACHE_WARMUP=0
 BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
@@ -358,21 +356,12 @@ BGP_API_RUNTIME_CACHE_CONTROL=1
 ORIGIN_AUTH_TOKEN=$origin_token
 CORS_ALLOWED_ORIGINS_JSON='["https://bgp.mehrnet.com"]'
 EOF
-chown root:bgpapi "$ENV_FILE"
-chmod 0640 "$ENV_FILE"
-cat > "$SECONDARY_ENV_FILE" <<EOF
-BGP_API_DATABASE_PATH=$DATA_DIR/secondary.mmap
-BGP_API_SECONDARY_DATABASE_PATH=$DATA_DIR/secondary.mmap
-LISTEN_ADDR=127.0.0.1:3103
-BGP_API_CACHE_STRATEGY=auto
-BGP_API_DEFER_CACHE_WARMUP=0
-BGP_API_BLOCK_UNTIL_CACHE_WARMUP=0
-BGP_API_RUNTIME_CACHE_CONTROL=1
-ORIGIN_AUTH_TOKEN=$origin_token
-CORS_ALLOWED_ORIGINS_JSON='["https://bgp.mehrnet.com"]'
-EOF
-chown root:bgpapi "$SECONDARY_ENV_FILE"
-chmod 0640 "$SECONDARY_ENV_FILE"
+  chown root:bgpapi "$path"
+  chmod 0640 "$path"
+}
+
+write_slot_env "$ENV_FILE" PRIMARY primary.mmap 3102
+write_slot_env "$SECONDARY_ENV_FILE" SECONDARY secondary.mmap 3103
 if [ "$DOMAIN_SET" = true ]; then
   cat > "$CADDY_ENV_FILE" <<EOF
 BGP_API_DOMAIN=$DOMAIN
