@@ -30,6 +30,12 @@ export function markLiteFallback(): void {
   try { localStorage.setItem(FALLBACK_KEY, String(Date.now() + FALLBACK_TTL_MS)); } catch { /* ignore */ }
 }
 
+export async function retryFullApi(): Promise<"full" | "lite"> {
+  try { localStorage.removeItem(FALLBACK_KEY); } catch { /* ignore */ }
+  probePromise = probeFullApi().finally(() => { probePromise = null; });
+  return probePromise;
+}
+
 async function probeFullApi(): Promise<"full" | "lite"> {
   try {
     const res = await fetch(`${FULL_API_BASE}/v1/health`, {

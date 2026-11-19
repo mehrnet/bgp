@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { ApiDocsView } from "./components/docs/ApiDocsView.tsx";
+import { LiteFallbackModal } from "./components/layout/LiteFallbackModal.tsx";
 import { NavHeader } from "./components/layout/NavHeader.tsx";
 import { LookupResult } from "./components/lookup/LookupResult.tsx";
 import { SearchBar } from "./components/lookup/SearchBar.tsx";
@@ -52,13 +53,11 @@ function useRouter(lookup: ReturnType<typeof createLookupState>) {
 function createToast() {
   const [toast, setToast] = createSignal<string | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  return {
-    toast,
-    showToast: (msg: string) => { clearTimeout(timer); setToast(msg); timer = setTimeout(() => setToast(null), 2400); }
-  };
+  return { toast, showToast: (msg: string) => { clearTimeout(timer); setToast(msg); timer = setTimeout(() => setToast(null), 2400); } };
 }
 
 export function App(): JSX.Element {
+  const [liteModalOpen, setLiteModalOpen] = createSignal(false);
   const lookup = createLookupState();
   const router = useRouter(lookup);
   const { toast, showToast } = createToast();
@@ -78,7 +77,7 @@ export function App(): JSX.Element {
 
   return (
     <>
-      <NavHeader currentView={router.route().view} onOpenHome={(e) => router.openRoute("home", e)} onOpenApi={(e) => router.openRoute("api", e)} />
+      <NavHeader currentView={router.route().view} onOpenHome={(e) => router.openRoute("home", e)} onOpenApi={(e) => router.openRoute("api", e)} onOpenLiteInfo={() => setLiteModalOpen(true)} />
       <main class="page">
         <PageHeading view={router.route().view} />
         <Show when={router.route().view === "home"} fallback={<ApiDocsView activeSection={router.route().apiSection} onCopied={showToast} />}>
@@ -94,6 +93,7 @@ export function App(): JSX.Element {
           <LookupResult loading={lookup.loading()} error={lookup.lookupError()} payload={lookup.payload()} isMyIp={router.route().isMyIp} onNavigate={router.navigate} onCopied={showToast} />
         </Show>
       </main>
+      <LiteFallbackModal open={liteModalOpen()} onClose={() => setLiteModalOpen(false)} onOpenApi={(e) => router.openRoute("api", e)} onStatus={showToast} />
       <Show when={toast()}>{(msg) => <div class="toast" role="status">{msg()}</div>}</Show>
     </>
   );
