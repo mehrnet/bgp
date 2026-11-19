@@ -30,6 +30,7 @@ import type {
 } from "./types.ts";
 
 const decoder = new TextDecoder();
+const uv = new UvCursor();
 
 export class LiteDB {
   readonly version: number;
@@ -250,7 +251,6 @@ export class LiteDB {
 
   decodeAutnumFrom(bytes: Uint8Array, off: number, end: number, asn: number, summaryOnly: boolean): AutnumRecord {
     if (off >= end || (bytes[off] ?? 0) === 0) return { asNumber: asn, hasAutnum: false };
-    const uv = new UvCursor();
     let p = off + 1;
     if (summaryOnly) {
       for (let i = 0; i < 4; i++) {
@@ -272,18 +272,25 @@ export class LiteDB {
     const r2 = uv.read(bytes, uv.next, end);
     const r3 = uv.read(bytes, uv.next, end);
     const r4 = uv.read(bytes, uv.next, end);
-    const readStr = (): string | null => {
-      const len = uv.read(bytes, uv.next, end);
-      p = uv.next;
-      const out = len > 0 ? decoder.decode(bytes.subarray(p, p + len)) : null;
-      uv.next = p + Math.max(len, 0);
-      return out;
-    };
-    const name = readStr();
-    const org = readStr();
-    const maintainers = readStr();
-    const abuseContact = readStr();
-    const description = readStr();
+    const nameLen = uv.read(bytes, uv.next, end);
+    p = uv.next;
+    const name = nameLen > 0 ? decoder.decode(bytes.subarray(p, p + nameLen)) : null;
+    p += nameLen;
+    const orgLen = uv.read(bytes, p, end);
+    p = uv.next;
+    const org = orgLen > 0 ? decoder.decode(bytes.subarray(p, p + orgLen)) : null;
+    p += orgLen;
+    const mntLen = uv.read(bytes, p, end);
+    p = uv.next;
+    const maintainers = mntLen > 0 ? decoder.decode(bytes.subarray(p, p + mntLen)) : null;
+    p += mntLen;
+    const acLen = uv.read(bytes, p, end);
+    p = uv.next;
+    const abuseContact = acLen > 0 ? decoder.decode(bytes.subarray(p, p + acLen)) : null;
+    p += acLen;
+    const descLen = uv.read(bytes, p, end);
+    p = uv.next;
+    const description = descLen > 0 ? decoder.decode(bytes.subarray(p, p + descLen)) : null;
     return {
       asNumber: asn,
       hasAutnum: true,
@@ -322,7 +329,6 @@ export class LiteDB {
     if (mIdx < 0 || mIdx >= this.multiCount) return [];
     const off = this.multiDataOff + this.view.getUint32(this.multiOffsetsOff + mIdx * 4, true);
     const end = this.multiDataOff + this.view.getUint32(this.multiOffsetsOff + (mIdx + 1) * 4, true);
-    const uv = new UvCursor();
     const count = uv.read(this.bytes, off, end);
     if (count < 0) return [];
     let p = uv.next;
@@ -336,7 +342,7 @@ export class LiteDB {
     return indices;
   }
 
-  async resolveASNSet(val: number, summaryOnly = false): Promise<AutnumRecord[]> {
+  resolveASNSet(val: number, summaryOnly = false): AutnumRecord[] | Promise<AutnumRecord[]> {
     const indices = this.resolveASNIndices(val);
     if (indices.length === 0) return [];
     if (!this.autnumChunks) return indices.map((i) => this.autnumByIdxSync(i, summaryOnly));
@@ -344,7 +350,6 @@ export class LiteDB {
   }
 
   lookupCountry(parsedIP: ParsedIP): string | null {
-    const uv = new UvCursor();
     const geoSeg = parsedIP.isV6
       ? findSeg(this.bytes, this.view, this.geoV6, (parsedIP.value >> 64n) >> BigInt(64 - this.geoV6B), skipGeo)
       : findSeg4(this.bytes, this.view, this.geoV4, parsedIP.value >>> (32 - this.geoV4B), skipGeo);
@@ -375,7 +380,6 @@ export class LiteDB {
   }
 
   async lookupIP(parsedIP: ParsedIP): Promise<IpLookupResult | null> {
-    const uv = new UvCursor();
     const isV6 = parsedIP.isV6;
     const allocTable = isV6 ? this.allocV6 : this.allocV4;
     const geoTable = isV6 ? this.geoV6 : this.geoV4;
@@ -453,7 +457,8 @@ export class LiteDB {
             const { start, end, cidr } = maskIPv4Range(parsedIP.value, bits);
             routeNet = { cidr, startIP: formatIPv4(start), endIP: formatIPv4(end) };
           }
-          routeASNs = await this.resolveASNSet(rawRouteVal, true);
+          const resolved = this.resolveASNSet(rawRouteVal, true);
+          routeASNs = this.autnumChunks ? await resolved : (resolved as AutnumRecord[]);
         }
       }
     }
@@ -592,7 +597,6 @@ export class LiteDB {
   }
 
   async lookupPrefix(parsedPrefix: ParsedPrefix, cursorOffset: number, limit: number): Promise<PrefixLookupResult | null> {
-    const uv = new UvCursor();
     const isV6 = parsedPrefix.isV6;
     const allocTable = isV6 ? this.allocV6 : this.allocV4;
     let allocation: AllocationItem | null = null;
