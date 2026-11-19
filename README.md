@@ -25,6 +25,26 @@ curl -sS 'https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1' | jq
 curl -sS 'https://bgp-api.mehrnet.com/v1/asn?query=AS13335&limit=20' | jq
 ```
 
+## Static JS Bundles (jsDelivr CDN)
+
+Self-contained ES modules are built and force-pushed as a single-commit snapshot to the `mini-js` orphan branch on every dataset release:
+
+| Bundle (`https://cdn.jsdelivr.net/gh/mehrnet/bgp@mini-js/...`) | Export | Resolution |
+| --- | --- | --- |
+| `country.min.js` | `lookupCountry(ip)` | IP -> ISO 3166-1 alpha-2 country code (`"US"`, `"DE"`, ...) |
+| `asn.min.js` | `lookupAsn(ip)` | IP -> `{ cidr, asn, as_number, asns, as_numbers }` |
+| `asn-meta.min.js` | `lookupAsnMeta(asn)` | ASN (`13335` or `"AS13335"`) -> `{ asn, as_number, name, organization, registry, country_code }` |
+
+```js
+import { lookupCountry } from "https://cdn.jsdelivr.net/gh/mehrnet/bgp@mini-js/country.min.js";
+import { lookupAsn } from "https://cdn.jsdelivr.net/gh/mehrnet/bgp@mini-js/asn.min.js";
+import { lookupAsnMeta } from "https://cdn.jsdelivr.net/gh/mehrnet/bgp@mini-js/asn-meta.min.js";
+
+const country = await lookupCountry("1.1.1.1");       // "US"
+const route = await lookupAsn("1.1.1.1");             // { cidr: "1.1.1.0/24", asn: "AS13335", as_number: 13335, ... }
+const meta = await lookupAsnMeta(route.as_number);    // { asn: "AS13335", name: "CLOUDFLARENET", organization: "...", registry: "arin", country_code: "US" }
+```
+
 ## Hardware & Requirements
 
 Linux with `systemd`, `amd64` or `arm64`, and root access (no Rust toolchain needed for release installs). Because `bgp-api` maps the `~4.1 GiB` `MNMF` dataset with `MADV_RANDOM`, cold lookups fault from page cache or disk:
@@ -77,6 +97,7 @@ Configured via `/etc/bgp-api/bgp-api.env`:
 - `crates/bgp-sqlite`: optional SQLite export pipeline
 - `crates/bgp-tools`: data parsers, builders, and `benchmark-http`
 - `lite/`: standalone Cloudflare Worker for `bgp-lite.mehrnet.com`
+- `mini-js/`: static browser ESM bundle generator (`country.min.js`, `asn.min.js`, `asn-meta.min.js`)
 - `web/`: SolidJS + TypeScript web frontend for `bgp.mehrnet.com`
 
 ## Development
@@ -87,6 +108,7 @@ Rust 1.88+ (`edition = "2024"`) and Node.js 24+:
 shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
 npm --prefix lite run typecheck && npm --prefix lite test
+npm --prefix mini-js run typecheck && npm --prefix mini-js test
 npm --prefix web run check && npm --prefix web test && npm --prefix web run build
 ```
 

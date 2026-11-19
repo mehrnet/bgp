@@ -23,6 +23,7 @@ Before committing any change, run from the repository root:
 shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
 npm --prefix lite run typecheck && npm --prefix lite test
+npm --prefix mini-js run typecheck && npm --prefix mini-js test
 npm --prefix web run check && npm --prefix web test
 ```
 

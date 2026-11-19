@@ -333,6 +333,30 @@ jobs:
         if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
         run: |
           npx --yes wrangler@4 deploy --config lite/wrangler.toml
+      - name: Build, test, and publish mini-js orphan branch
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+        run: |
+          cargo build -p bgp-tools --release --bin build-country-db
+          ./target/release/build-country-db -input final_data -output country.mncc
+          test -s country.mncc
+          npm --prefix mini-js ci
+          npm --prefix mini-js run typecheck
+          npm --prefix mini-js test
+          npm --prefix mini-js run build -- --country country.mncc --lite lite/bgp-lite.mnl --out-dir mini-js/dist
+          for bundle in country.min.js asn.min.js asn-meta.min.js; do
+            test -s "mini-js/dist/$bundle"
+          done
+          cp LICENSE NOTICE mini-js/dist/
+          git -C mini-js/dist init -b mini-js
+          git -C mini-js/dist config user.name "MehrWizard"
+          git -C mini-js/dist config user.email "328762575+MehrWizard@users.noreply.github.com"
+          git -C mini-js/dist add country.min.js asn.min.js asn-meta.min.js LICENSE NOTICE
+          git -C mini-js/dist commit -m "chore(mini-js): publish static bundles for ${RELEASE_TAG}"
+          git -C mini-js/dist push --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" mini-js:refs/heads/mini-js
+          for bundle in country.min.js asn.min.js asn-meta.min.js; do
+            curl -fsSL "https://purge.jsdelivr.net/gh/${{ github.repository }}@mini-js/${bundle}" >/dev/null || true
+          done
 
   build-api-binaries:
     name: Build static API binaries

@@ -1,0 +1,16 @@
+{
+  "name": "mehrnet-bgp-mini-js",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node --experimental-strip-types src/build.ts",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.2",
+    "typescript": "^5.8.2"
+  }
+}

@@ -29,6 +29,11 @@ jobs:
           npm --prefix lite ci
           npm --prefix lite run typecheck
           npm --prefix lite test
+      - name: Typecheck and test mini-js static bundles
+        run: |
+          npm --prefix mini-js ci
+          npm --prefix mini-js run typecheck
+          npm --prefix mini-js test
       - name: Check, test, and build web UI
         run: |
           npm --prefix web ci
