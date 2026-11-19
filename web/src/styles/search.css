@@ -1,0 +1,218 @@
+.lookup-tools {
+  margin-bottom: 1.5rem;
+}
+
+.lookup-error {
+  margin: 0.5625rem 0.125rem 0;
+  color: #fda4af;
+  font-size: 0.75rem;
+}
+
+.lookup-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.625rem;
+}
+
+.search-field {
+  min-width: 0;
+  height: 3.125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6875rem;
+  padding: 0 1rem;
+  border: 0.0625rem solid var(--border-strong);
+  border-radius: 0.4375rem;
+  background: var(--surface);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.search-field:focus-within {
+  border-color: var(--accent);
+  background: var(--surface-hover);
+}
+
+.search-field svg {
+  width: 1.1875rem;
+  height: 1.1875rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+#ip-input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+
+#ip-input::placeholder {
+  color: var(--text-muted);
+}
+
+.primary-button,
+.secondary-button {
+  height: 3.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5625rem;
+  padding: 0 1.1875rem;
+  border-radius: 0.4375rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.primary-button svg,
+.secondary-button svg,
+.ipv6-action svg {
+  width: 1.0625rem;
+  height: 1.0625rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.primary-button {
+  border: 0.0625rem solid var(--accent);
+  color: #0b1619;
+  background: var(--accent);
+}
+
+.primary-button:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.secondary-button {
+  border: 0.0625rem solid var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+}
+
+.secondary-button:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: var(--surface-hover);
+}
+
+.ipv6-button {
+  width: 100%;
+  min-height: 2.875rem;
+  margin-top: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.5rem 0.875rem;
+  border: 0.0625rem solid rgba(103, 232, 249, 0.24);
+  border-radius: 0.4375rem;
+  color: var(--text-soft);
+  background: rgba(103, 232, 249, 0.05);
+  text-align: left;
+}
+
+.ipv6-button:hover {
+  border-color: rgba(103, 232, 249, 0.46);
+  background: rgba(103, 232, 249, 0.09);
+}
+
+.ipv6-label,
+.ipv6-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.protocol-mark {
+  padding: 0.1875rem 0.4375rem;
+  border-radius: 0.25rem;
+  color: var(--info);
+  background: rgba(103, 232, 249, 0.1);
+  font-size: 0.625rem;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+#ipv6-address {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.ipv6-action {
+  flex: 0 0 auto;
+  color: var(--info);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.result {
+  min-height: 18.125rem;
+}
+
+.loading-panel,
+.error-panel {
+  min-height: 18.125rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.8125rem;
+  padding: 2.5rem;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-soft);
+  background: var(--surface);
+  text-align: center;
+}
+
+.spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0.125rem solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.error-panel svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.error-panel strong {
+  color: var(--text);
+  font-size: 0.9375rem;
+}
+
+.error-panel p {
+  max-width: 32.5rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}

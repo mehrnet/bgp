@@ -1,0 +1,195 @@
+@media (max-width: 51.25rem) {
+  .result-identity {
+    grid-template-columns: 1fr;
+  }
+
+  .network-block {
+    border-top: 0.0625rem solid var(--border);
+    border-left: 0;
+  }
+
+  .route-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 42.5rem) {
+  .nav-inner,
+  .page {
+    width: min(100% - 1.75rem, 73.75rem);
+  }
+
+  .page {
+    padding: 2.125rem 0 2.875rem;
+  }
+
+  .page-header {
+    margin-bottom: 1.25rem;
+  }
+
+  .lookup-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .secondary-button {
+    grid-column: 1 / -1;
+  }
+
+  .ipv6-button {
+    align-items: flex-start;
+  }
+
+  .ipv6-label {
+    min-width: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.3125rem;
+  }
+
+  .record-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-support {
+    white-space: normal;
+  }
+
+  .address-block,
+  .network-block {
+    padding: 1.3125rem 1.125rem;
+  }
+
+  .asn-detail-list .record-row {
+    grid-template-columns: minmax(5rem, 0.38fr) minmax(0, 0.62fr);
+  }
+
+  .api-overview {
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+  }
+
+  .api-overview .section-label,
+  .api-overview > span:not(.section-label),
+  .openapi-link {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .api-endpoints {
+    grid-template-columns: 1fr;
+  }
+
+  .api-endpoints > a,
+  .api-endpoints > a:nth-child(even),
+  .api-endpoints > a:nth-last-child(-n + 2) {
+    border-right: 0;
+    border-bottom: 0.0625rem solid var(--border);
+  }
+
+  .api-endpoints > a:last-child {
+    border-bottom: 0;
+  }
+
+  .api-language-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.375rem;
+  }
+
+  .api-operation {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.875rem;
+    margin-top: 1.5rem;
+  }
+
+  .api-table-scroll {
+    overflow: visible;
+  }
+
+  .api-parameters table {
+    min-width: 0;
+  }
+
+  .api-parameters thead {
+    position: absolute;
+    width: 0.0625rem;
+    height: 0.0625rem;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .api-parameters tbody,
+  .api-parameters tbody tr {
+    display: block;
+  }
+
+  .api-parameters tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 0;
+  }
+
+  .api-parameters tbody tr + tr {
+    border-top: 0.0625rem solid var(--border);
+  }
+
+  .api-parameters tbody th,
+  .api-parameters tbody td {
+    width: auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.625rem;
+  }
+
+  .api-parameters tbody th::before,
+  .api-parameters tbody td::before {
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 0.625rem;
+    font-weight: 750;
+    letter-spacing: 0;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .api-parameters tbody th::before {
+    content: "Parameter";
+  }
+
+  .api-parameters tbody td:nth-child(2)::before {
+    content: "In";
+  }
+
+  .api-parameters tbody td:nth-child(3)::before {
+    content: "Required";
+  }
+
+  .api-parameters tbody td:nth-child(4) {
+    grid-column: 1 / -1;
+    border-top: 0.0625rem solid var(--border);
+    background: rgba(255, 255, 255, 0.018);
+  }
+
+  .api-parameters tbody td:nth-child(4)::before {
+    content: "Description";
+  }
+
+  .api-code {
+    max-height: 18rem;
+    font-size: 0.6875rem;
+  }
+
+  .location-map-iframe {
+    height: 17rem;
+  }
+}

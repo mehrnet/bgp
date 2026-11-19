@@ -9,3 +9,4 @@ mehrnet_bgp.db
 /target/
 .wrangler/
 node_modules/
+dist/
