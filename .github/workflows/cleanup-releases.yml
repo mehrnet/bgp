@@ -1,0 +1,92 @@
+name: Cleanup Old Releases
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: Delete releases and tags older than this many days
+        required: false
+        default: "7"
+        type: string
+      dry_run:
+        description: List targets without deleting
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-releases
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete releases and tags older than retention window
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_days || '7' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          python3 - <<'EOF'
+          import concurrent.futures, datetime, json, os, subprocess, sys
+
+          days = int(os.environ.get("RETENTION_DAYS", "7") or "7")
+          if days < 1:
+              sys.exit("retention_days must be >= 1")
+          dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
+          repo = os.environ["GITHUB_REPOSITORY"]
+          cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+          print(f"Cutoff ({days}d UTC): {cutoff.isoformat()} (dry_run={dry_run})")
+
+          releases = [
+              r for page in json.loads(subprocess.check_output([
+                  "gh", "api", "--paginate", f"repos/{repo}/releases?per_page=100", "--slurp"
+              ])) for r in page
+          ]
+          releases.sort(key=lambda r: r["published_at"] or r["created_at"], reverse=True)
+
+          keep_tags = set()
+          del_releases = []
+          for idx, r in enumerate(releases):
+              ts = datetime.datetime.fromisoformat((r["published_at"] or r["created_at"]).replace("Z", "+00:00"))
+              # Always preserve the newest release so install/update scripts stay functional.
+              if idx == 0 or ts >= cutoff:
+                  keep_tags.add(r["tag_name"])
+              else:
+                  del_releases.append((r["id"], r["tag_name"]))
+
+          tags = [
+              t["name"] for page in json.loads(subprocess.check_output([
+                  "gh", "api", "--paginate", f"repos/{repo}/tags?per_page=100", "--slurp"
+              ])) for t in page
+          ]
+          del_tags = [t for t in tags if t not in keep_tags]
+
+          if dry_run:
+              print(f"Would delete {len(del_releases)} releases and {len(del_tags)} tags.")
+              for _, tag in del_releases[:20]:
+                  print(f"  release+tag: {tag}")
+              sys.exit(0)
+
+          def delete_release(item):
+              rid, tag = item
+              subprocess.run(["gh", "api", "-X", "DELETE", f"repos/{repo}/releases/{rid}"], check=True, stdout=subprocess.DEVNULL)
+              return tag
+
+          def delete_tag(tag):
+              subprocess.run(["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/tags/{tag}"], check=True, stdout=subprocess.DEVNULL)
+              return tag
+
+          with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+              rel_done = list(pool.map(delete_release, del_releases))
+              tag_done = list(pool.map(delete_tag, del_tags))
+
+          print(f"Deleted {len(rel_done)} releases and {len(tag_done)} tags (kept {len(keep_tags)}).")
+          EOF
