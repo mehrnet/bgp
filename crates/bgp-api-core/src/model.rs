@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -9,9 +11,9 @@ pub struct DatasetMetadata {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ResponseMeta {
+pub struct ResponseMeta<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub dataset: Option<DatasetMetadata>,
+    pub dataset: Option<Cow<'a, DatasetMetadata>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,15 +29,15 @@ pub struct RuntimeInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct HealthResponse {
+pub struct HealthResponse<'a> {
     pub ok: bool,
     pub service: &'static str,
     pub version: u8,
     pub database: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub build: Option<BuildInfo>,
+    pub build: Option<Cow<'a, BuildInfo>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub dataset: Option<DatasetMetadata>,
+    pub dataset: Option<Cow<'a, DatasetMetadata>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runtime: Option<RuntimeInfo>,
 }
@@ -52,44 +54,44 @@ pub struct ErrorResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AsnIdentity {
+pub struct AsnIdentity<'a> {
     pub asn: String,
     pub as_number: u32,
-    pub name: Option<String>,
-    pub organization: Option<String>,
+    pub name: Option<Cow<'a, str>>,
+    pub organization: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-pub struct LookupNetwork {
+pub struct LookupNetwork<'a> {
     pub cidr: Option<String>,
     pub start_ip: Option<String>,
     pub end_ip: Option<String>,
     pub asn: Option<String>,
     pub asns: Vec<String>,
-    pub origins: Vec<AsnIdentity>,
+    pub origins: Vec<AsnIdentity<'a>>,
     pub as_number: Option<u32>,
-    pub status: Option<String>,
-    pub abuse_contact: Option<String>,
+    pub status: Option<Cow<'a, str>>,
+    pub abuse_contact: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-pub struct LookupAllocation {
+pub struct LookupAllocation<'a> {
     pub start_ip: Option<String>,
     pub end_ip: Option<String>,
-    pub registry: Option<String>,
-    pub country_code: Option<String>,
-    pub country_raw: Option<String>,
-    pub name: Option<String>,
-    pub allocation_date: Option<String>,
-    pub status: Option<String>,
-    pub abuse_contact: Option<String>,
+    pub registry: Option<Cow<'a, str>>,
+    pub country_code: Option<Cow<'a, str>>,
+    pub country_raw: Option<Cow<'a, str>>,
+    pub name: Option<Cow<'a, str>>,
+    pub allocation_date: Option<Cow<'a, str>>,
+    pub status: Option<Cow<'a, str>>,
+    pub abuse_contact: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-pub struct LookupLocation {
-    pub country_code: Option<String>,
-    pub region: Option<String>,
-    pub city: Option<String>,
+pub struct LookupLocation<'a> {
+    pub country_code: Option<Cow<'a, str>>,
+    pub region: Option<Cow<'a, str>>,
+    pub city: Option<Cow<'a, str>>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
 }
@@ -102,75 +104,75 @@ pub struct LookupSources {
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-pub struct LookupDetails {
+pub struct LookupDetails<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub allocations: Vec<LookupDetailRecord>,
+    pub allocations: Vec<LookupDetailRecord<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub routes: Vec<LookupDetailRecord>,
+    pub routes: Vec<LookupDetailRecord<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub geofeeds: Vec<LookupDetailRecord>,
+    pub geofeeds: Vec<LookupDetailRecord<'a>>,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
-pub struct LookupDetailRecord {
+pub struct LookupDetailRecord<'a> {
     pub start_ip: String,
     pub end_ip: String,
     pub version: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub registry: Option<String>,
+    pub registry: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub country_code: Option<String>,
+    pub country_code: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub country_raw: Option<String>,
+    pub country_raw: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cidr: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub asn: Option<String>,
+    pub asn: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub as_number: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub region: Option<String>,
+    pub region: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub city: Option<String>,
+    pub city: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latitude: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longitude: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub allocation_date: Option<String>,
+    pub allocation_date: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_modified: Option<String>,
+    pub last_modified: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
+    pub source: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub maintainers: Option<String>,
+    pub maintainers: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub organization: Option<String>,
+    pub organization: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub abuse_contact: Option<String>,
+    pub abuse_contact: Option<Cow<'a, str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct LookupResponse {
+pub struct LookupResponse<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<ResponseMeta>,
+    pub meta: Option<ResponseMeta<'a>>,
     pub ip: String,
     pub version: u8,
-    pub registry: Option<String>,
-    pub allocation_date: Option<String>,
-    pub allocation_status: Option<String>,
-    pub network: LookupNetwork,
-    pub allocation: LookupAllocation,
-    pub location: LookupLocation,
+    pub registry: Option<Cow<'a, str>>,
+    pub allocation_date: Option<Cow<'a, str>>,
+    pub allocation_status: Option<Cow<'a, str>>,
+    pub network: LookupNetwork<'a>,
+    pub allocation: LookupAllocation<'a>,
+    pub location: LookupLocation<'a>,
     pub sources: LookupSources,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub details: Option<LookupDetails>,
+    pub details: Option<LookupDetails<'a>>,
 }

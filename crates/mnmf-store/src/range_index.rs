@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use crate::codec::be_u32;
 use crate::index::lower_bound_stride;
@@ -148,4 +149,59 @@ fn addr_from_slice(src: &[u8], version: u8) -> Address {
         out.copy_from_slice(s);
     }
     Address(out)
+}
+
+pub(crate) struct OverlapCollector {
+    ids: BTreeSet<u32>,
+    scanned: usize,
+    scan_limit: usize,
+    after: i64,
+}
+
+impl OverlapCollector {
+    pub(crate) fn new(scan_limit: usize, after: i64) -> Self {
+        Self {
+            ids: BTreeSet::new(),
+            scanned: 0,
+            scan_limit,
+            after,
+        }
+    }
+
+    pub(crate) fn push_id(&mut self, id: u32) -> Result<(), StoreError> {
+        self.scanned += 1;
+        if self.scanned > self.scan_limit {
+            return Err(StoreError::QueryTooBroad);
+        }
+        if i64::from(id) > self.after {
+            self.ids.insert(id);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn collect_key(
+        &mut self,
+        table: &[u8],
+        mut pos: usize,
+        key: &[u8],
+    ) -> Result<(), StoreError> {
+        let key_len = key.len();
+        let stride = key_len + 4;
+        let n = table.len() / stride;
+        while pos < n {
+            let row = table
+                .get(pos * stride..(pos + 1) * stride)
+                .ok_or_else(|| StoreError::InvalidFormat("prefix row truncated".into()))?;
+            if row.get(..key_len) != Some(key) {
+                break;
+            }
+            self.push_id(be_u32(row.get(key_len..stride).unwrap_or(&[]))?)?;
+            pos += 1;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_vec(self) -> Vec<u32> {
+        self.ids.into_iter().collect()
+    }
 }

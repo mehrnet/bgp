@@ -25,6 +25,10 @@ use mnmf_store::Db;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 
+#[cfg(all(target_os = "linux", target_env = "musl", target_arch = "x86_64"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 fn main() {
     let mut rt_builder = tokio::runtime::Builder::new_multi_thread();
     rt_builder.enable_all();
@@ -179,26 +183,18 @@ async fn serve_hyper(
     state: Arc<ApiState>,
     req: Request<Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
-    let method = req.method().as_str().to_owned();
-    let path = req.uri().path().to_owned();
-    let query = req.uri().query().unwrap_or("").to_owned();
-    let origin = req
-        .headers()
-        .get(ORIGIN)
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned);
+    let origin = req.headers().get(ORIGIN).and_then(|v| v.to_str().ok());
     let token = req
         .headers()
         .get("X-BGP-API-Origin-Token")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned);
+        .and_then(|v| v.to_str().ok());
     let resp = state
         .handle(&ApiRequest {
-            method: &method,
-            path: &path,
-            query: &query,
-            origin: origin.as_deref(),
-            origin_token: token.as_deref(),
+            method: req.method().as_str(),
+            path: req.uri().path(),
+            query: req.uri().query().unwrap_or(""),
+            origin,
+            origin_token: token,
         })
         .await;
     Ok(to_hyper_response(resp))
@@ -206,24 +202,32 @@ async fn serve_hyper(
 
 fn to_hyper_response(resp: bgp_api_core::ApiResponse) -> Response<Full<Bytes>> {
     let status = StatusCode::from_u16(resp.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-    let mut builder = Response::builder().status(status);
+    let mut out = Response::new(Full::new(resp.body));
+    *out.status_mut() = status;
+    let headers = out.headers_mut();
     if let Some(orig) = resp.cors_origin
         && let Ok(val) = HeaderValue::from_str(&orig)
     {
-        builder = builder.header(ACCESS_CONTROL_ALLOW_ORIGIN, val);
+        headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, val);
     }
-    builder = builder
-        .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, OPTIONS")
-        .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type")
-        .header(VARY, "Origin");
+    headers.insert(
+        ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_static("GET, OPTIONS"),
+    );
+    headers.insert(
+        ACCESS_CONTROL_ALLOW_HEADERS,
+        HeaderValue::from_static("Content-Type"),
+    );
+    headers.insert(VARY, HeaderValue::from_static("Origin"));
     if resp.is_options {
-        builder = builder.header(ACCESS_CONTROL_MAX_AGE, "86400");
+        headers.insert(ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("86400"));
     } else {
-        builder = builder.header(CONTENT_TYPE, "application/json; charset=utf-8");
+        headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        );
     }
-    builder
-        .body(Full::new(resp.body))
-        .unwrap_or_else(|_| Response::new(Full::new(Bytes::new())))
+    out
 }
 
 fn log_cache_plan(plan: &CachePlan, mem_total: u64, env: &ServerEnv) {

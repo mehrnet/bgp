@@ -125,5 +125,34 @@ fn decodes_legacy_non_utf8_whois_bytes_lossily() -> Result<(), Box<dyn std::erro
     let rec = db.allocation(1, false)?;
     assert_eq!(rec.organization, "Org\u{FFFD}");
     assert_eq!(rec.description, "Stra\u{FFFD}e");
+    assert!(matches!(
+        db.allocation_ref(1, false)?.description,
+        std::borrow::Cow::Owned(_)
+    ));
+    Ok(())
+}
+
+#[test]
+fn bounded_prefix_search_finds_all_nested_v4_and_v6_matches()
+-> Result<(), Box<dyn std::error::Error>> {
+    use mnmf_store::types::TableKind;
+    let v4 = [
+        ([10, 0, 0, 0], 8u8, 1u32),
+        ([10, 20, 0, 0], 16, 2),
+        ([10, 20, 30, 0], 24, 3),
+        ([10, 20, 30, 40], 32, 4),
+        ([10, 20, 31, 0], 24, 99),
+    ];
+    let mut p4 = Vec::with_capacity(v4.len() * 9);
+    for (ip, len, id) in v4 {
+        p4.extend_from_slice(&ip);
+        p4.push(len);
+        p4.extend_from_slice(&id.to_be_bytes());
+    }
+    let db = Db::from_bytes(assemble_mnmf(&[(Section::AllocPrefixV4, p4)]))?;
+    let ids = db.matching_prefix_ids(TableKind::Allocations, "10.20.30.40".parse()?, 0)?;
+    assert_eq!(ids, vec![4, 3, 2, 1]);
+    let limited = db.matching_prefix_ids(TableKind::Allocations, "10.20.30.40".parse()?, 2)?;
+    assert_eq!(limited, vec![4, 3]);
     Ok(())
 }

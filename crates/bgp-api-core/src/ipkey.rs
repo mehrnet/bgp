@@ -27,19 +27,30 @@ pub struct ParsedRange {
     pub address_count: String,
 }
 
+impl RuntimeIp {
+    #[must_use]
+    pub fn from_ip(ip: IpAddr) -> Self {
+        let version = if ip.is_ipv4() { 4 } else { 6 };
+        Self {
+            canonical: ip.to_string(),
+            ip,
+            version,
+        }
+    }
+}
+
 #[must_use]
-pub fn parse_runtime_ip(input: &str) -> Option<RuntimeIp> {
+pub fn parse_ip_only(input: &str) -> Option<IpAddr> {
     let trimmed = input.trim();
     if trimmed.contains('%') {
         return None;
     }
-    let ip: IpAddr = trimmed.parse().ok()?;
-    let version = if ip.is_ipv4() { 4 } else { 6 };
-    Some(RuntimeIp {
-        canonical: ip.to_string(),
-        ip,
-        version,
-    })
+    trimmed.parse().ok()
+}
+
+#[must_use]
+pub fn parse_runtime_ip(input: &str) -> Option<RuntimeIp> {
+    parse_ip_only(input).map(RuntimeIp::from_ip)
 }
 
 #[must_use]

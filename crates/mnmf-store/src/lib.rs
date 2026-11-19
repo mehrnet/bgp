@@ -1,3 +1,4 @@
+pub mod borrowed;
 pub mod builder;
 pub(crate) mod builder_indexes;
 pub(crate) mod builder_meta;
@@ -52,6 +53,7 @@ pub struct Db {
     backing: Backing,
     sections: [(usize, usize); SECTION_COUNT],
     meta: Metadata,
+    pool_count: u64,
 }
 
 impl Db {
@@ -64,6 +66,8 @@ impl Db {
         // SAFETY: The MNMF dataset file is opened read-only and never mutated in place.
         #[allow(unsafe_code)]
         let mmap = unsafe { Mmap::map(&file)? };
+        #[cfg(unix)]
+        let _ = mmap.advise(memmap2::Advice::Random);
         Self::init(Some(path_buf), Backing::Mmap(mmap))
     }
 
@@ -75,11 +79,20 @@ impl Db {
         let data = backing.as_slice();
         let sections = parse_section_table(data)?;
         let meta = validate_dataset(data, &sections)?;
+        let sec_slice = |s: Section| {
+            let (off, len) = sections.get(s as usize).copied().unwrap_or((0, 0));
+            data.get(off..off + len).unwrap_or(&[])
+        };
+        let pool_count = StringPool::validate_and_count(
+            sec_slice(Section::StringPoolOffsets),
+            sec_slice(Section::StringPoolData),
+        )?;
         Ok(Self {
             path,
             backing,
             sections,
             meta,
+            pool_count,
         })
     }
 
@@ -92,10 +105,11 @@ impl Db {
         self.backing.as_slice().get(off..off + len).unwrap_or(&[])
     }
 
-    fn pool(&self) -> Result<StringPool<'_>, StoreError> {
-        StringPool::new(
+    fn pool(&self) -> StringPool<'_> {
+        StringPool::from_validated(
             self.sec(Section::StringPoolOffsets),
             self.sec(Section::StringPoolData),
+            self.pool_count,
         )
     }
 

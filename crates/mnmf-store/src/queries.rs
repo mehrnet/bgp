@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use crate::Db;
+use crate::borrowed::{AllocationRef, AutnumRef, GeofeedRef, RouteRef};
 use crate::codec::{be_u32, be_u64};
 use crate::format::{prefix_section, record_slice, slice_asn_routes};
 use crate::index::{
@@ -9,7 +10,7 @@ use crate::index::{
 };
 use crate::range_index::direct_range_entries;
 use crate::records::{
-    decode_allocation, decode_autnum, decode_geofeed, decode_route, decode_summary,
+    decode_allocation_ref, decode_autnum_ref, decode_geofeed_ref, decode_route_ref, decode_summary,
 };
 use crate::types::{
     Allocation, Autnum, Geofeed, RangeIndexEntry, RangeQuery, RangeSummary, Route, Section,
@@ -17,34 +18,55 @@ use crate::types::{
 };
 
 impl Db {
-    pub fn allocation(&self, id: u32, lookup_only: bool) -> Result<Allocation, StoreError> {
+    pub fn allocation_ref(
+        &self,
+        id: u32,
+        lookup_only: bool,
+    ) -> Result<AllocationRef<'_>, StoreError> {
         let raw = record_slice(
             self.sec(Section::AllocationOffsets),
             self.sec(Section::AllocationData),
             id,
         )?;
-        decode_allocation(raw, &self.pool()?, lookup_only)
+        decode_allocation_ref(raw, &self.pool(), lookup_only)
     }
 
-    pub fn route(&self, id: u32, lookup_only: bool) -> Result<Route, StoreError> {
+    pub fn allocation(&self, id: u32, lookup_only: bool) -> Result<Allocation, StoreError> {
+        self.allocation_ref(id, lookup_only)
+            .map(AllocationRef::into_owned)
+    }
+
+    pub fn route_ref(&self, id: u32, lookup_only: bool) -> Result<RouteRef<'_>, StoreError> {
         let raw = record_slice(
             self.sec(Section::RouteOffsets),
             self.sec(Section::RouteData),
             id,
         )?;
-        decode_route(raw, &self.pool()?, lookup_only)
+        decode_route_ref(raw, &self.pool(), lookup_only)
     }
 
-    pub fn geofeed(&self, id: u32) -> Result<Geofeed, StoreError> {
+    pub fn route(&self, id: u32, lookup_only: bool) -> Result<Route, StoreError> {
+        self.route_ref(id, lookup_only).map(RouteRef::into_owned)
+    }
+
+    pub fn geofeed_ref(&self, id: u32) -> Result<GeofeedRef<'_>, StoreError> {
         let raw = record_slice(
             self.sec(Section::GeofeedOffsets),
             self.sec(Section::GeofeedData),
             id,
         )?;
-        decode_geofeed(raw, &self.pool()?)
+        decode_geofeed_ref(raw, &self.pool())
     }
 
-    pub fn autnum(&self, asn: u32, identity_only: bool) -> Result<Option<Autnum>, StoreError> {
+    pub fn geofeed(&self, id: u32) -> Result<Geofeed, StoreError> {
+        self.geofeed_ref(id).map(GeofeedRef::into_owned)
+    }
+
+    pub fn autnum_ref(
+        &self,
+        asn: u32,
+        identity_only: bool,
+    ) -> Result<Option<AutnumRef<'_>>, StoreError> {
         let Some(row) = find_exact_u32(self.sec(Section::AutnumIndex), AUTNUM_INDEX_STRIDE, asn)?
         else {
             return Ok(None);
@@ -55,7 +77,13 @@ impl Db {
             .sec(Section::AutnumData)
             .get(off..off.saturating_add(len))
             .ok_or_else(|| StoreError::InvalidFormat("autnum record out of bounds".into()))?;
-        Ok(Some(decode_autnum(raw, &self.pool()?, identity_only)?))
+        Ok(Some(decode_autnum_ref(raw, &self.pool(), identity_only)?))
+    }
+
+    pub fn autnum(&self, asn: u32, identity_only: bool) -> Result<Option<Autnum>, StoreError> {
+        Ok(self
+            .autnum_ref(asn, identity_only)?
+            .map(AutnumRef::into_owned))
     }
 
     pub fn asn_route_slice(

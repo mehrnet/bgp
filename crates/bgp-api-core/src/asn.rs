@@ -1,13 +1,20 @@
+use std::borrow::Cow;
+
 use mnmf_store::Db;
 
 use crate::dto::{autnum_object, route_object};
-use crate::model::ResponseMeta;
+use crate::model::{DatasetMetadata, ResponseMeta};
 use crate::resource_model::{AsnResponse, RoutePage};
 use crate::resources::{Page, paginate_routes};
-use crate::service::{ApiError, dataset_meta_from_db};
+use crate::service::ApiError;
 
-pub fn lookup_asn(db: &Db, asn: u32, page: Page) -> Result<Option<AsnResponse>, ApiError> {
-    let autnum = db.autnum(asn, false)?.map(autnum_object);
+pub(crate) fn lookup_asn<'a>(
+    db: &'a Db,
+    meta: &'a DatasetMetadata,
+    asn: u32,
+    page: Page,
+) -> Result<Option<AsnResponse<'a>>, ApiError> {
+    let autnum = db.autnum_ref(asn, false)?.map(autnum_object);
     let (total, ids) =
         db.asn_route_slice(asn, page.numbered, page.number, page.cursor, page.limit)?;
     if autnum.is_none() && total == 0 {
@@ -15,7 +22,7 @@ pub fn lookup_asn(db: &Db, asn: u32, page: Page) -> Result<Option<AsnResponse>, 
     }
     let mut routes = Vec::with_capacity(ids.len());
     for id in ids {
-        routes.push(route_object(id, db.route(id, false)?));
+        routes.push(route_object(id, db.route_ref(id, false)?));
     }
     let route_page = if page.numbered {
         let total_pages =
@@ -39,7 +46,7 @@ pub fn lookup_asn(db: &Db, asn: u32, page: Page) -> Result<Option<AsnResponse>, 
     };
     Ok(Some(AsnResponse {
         meta: Some(ResponseMeta {
-            dataset: Some(dataset_meta_from_db(db)),
+            dataset: Some(Cow::Borrowed(meta)),
         }),
         asn: format!("AS{asn}"),
         as_number: asn,

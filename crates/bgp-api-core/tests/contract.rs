@@ -176,5 +176,35 @@ async fn handlers_enforce_contract_auth_cors_and_errors() -> Result<(), Box<dyn 
         })
         .await;
     assert_eq!(missing_asn.status, 404);
+
+    let encoded_pfx = state
+        .handle(&ApiRequest {
+            origin_token: Some("secret"),
+            ..req("GET", "/v1/prefix", "prefix=2001%3Adb8%3A%3A%2F32")
+        })
+        .await;
+    assert_eq!(encoded_pfx.status, 200);
+    let cached_pfx = state
+        .handle(&ApiRequest {
+            origin_token: Some("secret"),
+            ..req("GET", "/v1/prefix", "prefix=2001:db8::/32")
+        })
+        .await;
+    assert_eq!(cached_pfx.body, encoded_pfx.body);
     Ok(())
+}
+
+#[test]
+fn sharded_cache_handles_binary_ip_keys_and_clear() {
+    use bgp_api_core::cache::ResponseCache;
+    use bytes::Bytes;
+    use std::net::IpAddr;
+    let cache: ResponseCache<IpAddr> = ResponseCache::new(4096);
+    let ip: IpAddr = "1.1.1.1".parse().unwrap_or(IpAddr::from([0, 0, 0, 0]));
+    cache.insert(ip, Bytes::from_static(b"cached-ip"));
+    assert_eq!(cache.get(&ip), Some(Bytes::from_static(b"cached-ip")));
+    let (count, bytes) = cache.disable_and_clear();
+    assert_eq!(count, 1);
+    assert_eq!(bytes, 9);
+    assert_eq!(cache.get(&ip), None);
 }

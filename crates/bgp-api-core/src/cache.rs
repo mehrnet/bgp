@@ -1,48 +1,70 @@
+use std::borrow::Borrow;
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::hash::{Hash, Hasher};
+use std::net::IpAddr;
+use std::sync::{Arc, RwLock};
 
 use bytes::Bytes;
 
+const CACHE_SHARDS: usize = 16;
+
 #[derive(Debug, Default)]
-struct CacheInner {
+struct CacheInner<K> {
     enabled: bool,
     max_bytes: usize,
     used_bytes: usize,
-    entries: HashMap<String, Bytes>,
-    order: VecDeque<String>,
+    entries: HashMap<K, Bytes>,
+    order: VecDeque<K>,
 }
 
 #[derive(Debug)]
-pub struct ResponseCache {
-    inner: Mutex<CacheInner>,
+pub struct ResponseCache<K> {
+    shards: [RwLock<CacheInner<K>>; CACHE_SHARDS],
 }
 
-impl ResponseCache {
+impl<K: Eq + Hash + Clone> ResponseCache<K> {
     #[must_use]
     pub fn new(max_bytes: usize) -> Self {
-        Self {
-            inner: Mutex::new(CacheInner {
-                enabled: max_bytes > 0,
-                max_bytes,
+        let per_shard = if max_bytes == 0 {
+            0
+        } else {
+            max_bytes.div_ceil(CACHE_SHARDS)
+        };
+        let shards = std::array::from_fn(|_| {
+            RwLock::new(CacheInner {
+                enabled: per_shard > 0,
+                max_bytes: per_shard,
                 used_bytes: 0,
                 entries: HashMap::new(),
                 order: VecDeque::new(),
-            }),
-        }
+            })
+        });
+        Self { shards }
+    }
+
+    fn shard_for<Q: Hash + ?Sized>(&self, key: &Q) -> &RwLock<CacheInner<K>> {
+        let mut h = FnvHasher(0xcbf2_9ce4_8422_2325);
+        key.hash(&mut h);
+        let idx = (h.finish() as usize) & (CACHE_SHARDS - 1);
+        // Safe: CACHE_SHARDS is 16 and idx is masked with 15.
+        self.shards.get(idx).unwrap_or(&self.shards[0])
     }
 
     #[must_use]
-    pub fn get(&self, key: &str) -> Option<Bytes> {
-        let guard = self.inner.lock().ok()?;
+    pub fn get<Q>(&self, key: &Q) -> Option<Bytes>
+    where
+        K: Borrow<Q>,
+        Q: Eq + Hash + ?Sized,
+    {
+        let guard = self.shard_for(key).read().ok()?;
         if !guard.enabled {
             return None;
         }
         guard.entries.get(key).cloned()
     }
 
-    pub fn insert(&self, key: String, body: Bytes) {
-        let Ok(mut guard) = self.inner.lock() else {
+    pub fn insert(&self, key: K, body: Bytes) {
+        let Ok(mut guard) = self.shard_for(&key).write() else {
             return;
         };
         if !guard.enabled || guard.max_bytes == 0 || body.len() > guard.max_bytes {
@@ -65,23 +87,43 @@ impl ResponseCache {
     }
 
     pub fn enable(&self) {
-        if let Ok(mut guard) = self.inner.lock() {
-            guard.enabled = guard.max_bytes > 0;
+        for shard in &self.shards {
+            if let Ok(mut guard) = shard.write() {
+                guard.enabled = guard.max_bytes > 0;
+            }
         }
     }
 
     #[must_use]
     pub fn disable_and_clear(&self) -> (usize, usize) {
-        let Ok(mut guard) = self.inner.lock() else {
-            return (0, 0);
-        };
-        let count = guard.entries.len();
-        let bytes = guard.used_bytes;
-        guard.enabled = false;
-        guard.used_bytes = 0;
-        guard.entries.clear();
-        guard.order.clear();
+        let (mut count, mut bytes) = (0usize, 0usize);
+        for shard in &self.shards {
+            let Ok(mut guard) = shard.write() else {
+                continue;
+            };
+            count += guard.entries.len();
+            bytes += guard.used_bytes;
+            guard.enabled = false;
+            guard.used_bytes = 0;
+            guard.entries.clear();
+            guard.order.clear();
+        }
         (count, bytes)
+    }
+}
+
+struct FnvHasher(u64);
+
+impl Hasher for FnvHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 ^= u64::from(b);
+            self.0 = self.0.wrapping_mul(0x0100_0000_01b3);
+        }
     }
 }
 
@@ -95,8 +137,8 @@ pub struct RuntimeCacheRelease {
 
 #[derive(Debug, Clone)]
 pub struct RuntimeCacheController {
-    pub(crate) compact: Arc<ResponseCache>,
-    pub(crate) resource: Arc<ResponseCache>,
+    pub(crate) compact: Arc<ResponseCache<IpAddr>>,
+    pub(crate) resource: Arc<ResponseCache<String>>,
 }
 
 impl RuntimeCacheController {

@@ -138,10 +138,10 @@ fn covering_range_entries(
             continue;
         }
         let (start, end, ver) = if kind == RangeKind::Allocations {
-            let r = db.allocation(id, false)?;
+            let r = db.allocation_ref(id, false)?;
             (r.start, r.end, r.version)
         } else {
-            let r = db.route(id, false)?;
+            let r = db.route_ref(id, false)?;
             let (s, e) = route_bounds(&r);
             (s, e, r.version)
         };

@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr};
 
 use crate::codec::{be_u32, be_u64};
+use crate::range_index::OverlapCollector;
 use crate::types::StoreError;
 
 pub(crate) const AUTNUM_INDEX_STRIDE: usize = 16;
@@ -14,13 +14,24 @@ pub(crate) const PREFIX_V6_STRIDE: usize = 21;
 pub(crate) fn lower_bound_stride<'a, F>(
     table: &'a [u8],
     stride: usize,
+    cmp: F,
+) -> Result<usize, StoreError>
+where
+    F: FnMut(&'a [u8]) -> Result<Ordering, StoreError>,
+{
+    lower_bound_stride_range(table, stride, 0, table.len() / stride, cmp)
+}
+
+pub(crate) fn lower_bound_stride_range<'a, F>(
+    table: &'a [u8],
+    stride: usize,
+    mut lo: usize,
+    mut hi: usize,
     mut cmp: F,
 ) -> Result<usize, StoreError>
 where
     F: FnMut(&'a [u8]) -> Result<Ordering, StoreError>,
 {
-    let n = table.len() / stride;
-    let (mut lo, mut hi) = (0usize, n);
     while lo < hi {
         let mid = lo + (hi - lo) / 2;
         let row = table
@@ -99,18 +110,19 @@ pub(crate) fn matching_prefix_ids(
     let (addr_bytes, stride, max_bits) = prefix_layout(ip.is_ipv4());
     let key_len = addr_bytes + 1;
     let n = table.len() / stride;
+    let mut hi = n;
     let mut ids = Vec::new();
     let mut target = [0u8; 17];
-
     for len in (0..=max_bits).rev() {
         if limit > 0 && ids.len() >= limit {
             break;
         }
         build_prefix_key(&mut target, addr_bytes, ip, len);
         let key = target.get(..key_len).unwrap_or(&[]);
-        let mut pos = lower_bound_stride(table, stride, |row| {
+        let mut pos = lower_bound_stride_range(table, stride, 0, hi, |row| {
             Ok(row.get(..key_len).unwrap_or(&[]).cmp(key))
         })?;
+        hi = pos;
         while pos < n && (limit == 0 || ids.len() < limit) {
             let row = table
                 .get(pos * stride..(pos + 1) * stride)
@@ -134,20 +146,16 @@ pub(crate) fn overlap_route_ids(
 ) -> Result<Vec<u32>, StoreError> {
     let (addr_bytes, stride, max_bits) = prefix_layout(start_ip.is_ipv4());
     let key_len = addr_bytes + 1;
-    let mut collector = OverlapCollector {
-        ids: BTreeSet::new(),
-        scanned: 0,
-        scan_limit,
-        after,
-    };
+    let mut hi = table.len() / stride;
+    let mut collector = OverlapCollector::new(scan_limit, after);
     let mut target = [0u8; 17];
-
     for len in (0..=max_bits).rev() {
         build_prefix_key(&mut target, addr_bytes, start_ip, len);
         let key = target.get(..key_len).unwrap_or(&[]);
-        let pos = lower_bound_stride(table, stride, |row| {
+        let pos = lower_bound_stride_range(table, stride, 0, hi, |row| {
             Ok(row.get(..key_len).unwrap_or(&[]).cmp(key))
         })?;
+        hi = pos;
         collector.collect_key(table, pos, key)?;
     }
 
@@ -170,44 +178,7 @@ pub(crate) fn overlap_route_ids(
         collector.push_id(be_u32(row.get(key_len..stride).unwrap_or(&[]))?)?;
         pos += 1;
     }
-    Ok(collector.ids.into_iter().collect())
-}
-
-struct OverlapCollector {
-    ids: BTreeSet<u32>,
-    scanned: usize,
-    scan_limit: usize,
-    after: i64,
-}
-
-impl OverlapCollector {
-    fn push_id(&mut self, id: u32) -> Result<(), StoreError> {
-        self.scanned += 1;
-        if self.scanned > self.scan_limit {
-            return Err(StoreError::QueryTooBroad);
-        }
-        if i64::from(id) > self.after {
-            self.ids.insert(id);
-        }
-        Ok(())
-    }
-
-    fn collect_key(&mut self, table: &[u8], mut pos: usize, key: &[u8]) -> Result<(), StoreError> {
-        let key_len = key.len();
-        let stride = key_len + 4;
-        let n = table.len() / stride;
-        while pos < n {
-            let row = table
-                .get(pos * stride..(pos + 1) * stride)
-                .ok_or_else(|| StoreError::InvalidFormat("prefix row truncated".into()))?;
-            if row.get(..key_len) != Some(key) {
-                break;
-            }
-            self.push_id(be_u32(row.get(key_len..stride).unwrap_or(&[]))?)?;
-            pos += 1;
-        }
-        Ok(())
-    }
+    Ok(collector.into_vec())
 }
 
 fn prefix_layout(is_v4: bool) -> (usize, usize, usize) {

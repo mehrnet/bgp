@@ -1,16 +1,19 @@
+use std::borrow::Cow;
+
 use mnmf_store::Db;
-use mnmf_store::types::{Address, Allocation, TableKind};
+use mnmf_store::borrowed::AllocationRef;
+use mnmf_store::types::{Address, TableKind};
 
 use crate::details::route_cidr;
 use crate::dto::{allocation_object, route_object};
 use crate::ipkey::{ParsedPrefix, ParsedRange, parse_prefix, summary_prefix_key};
-use crate::model::ResponseMeta;
+use crate::model::{DatasetMetadata, ResponseMeta};
 use crate::range_cursor::range_page_entries;
 use crate::resource_model::{
     AllocationObject, PrefixDescriptor, PrefixResponse, RangeDescriptor, RangeFacet, RangeKind,
     RangeResponse, RangeSummaryDto, RouteObject, RoutePage,
 };
-use crate::service::{ApiError, dataset_meta_from_db};
+use crate::service::ApiError;
 
 const MAX_OVERLAP_ENTRIES: usize = 2_000_000;
 
@@ -28,27 +31,28 @@ pub struct RangePage {
     pub limit: usize,
 }
 
-pub fn lookup_prefix(
-    db: &Db,
+pub(crate) fn lookup_prefix<'a>(
+    db: &'a Db,
+    meta: &'a DatasetMetadata,
     prefix: &ParsedPrefix,
     page: Page,
-) -> Result<PrefixResponse, ApiError> {
+) -> Result<PrefixResponse<'a>, ApiError> {
     let allocation = covering_allocation(db, prefix)?;
     let mut ids =
         db.overlap_route_ids(prefix.start, prefix.end, page.cursor, MAX_OVERLAP_ENTRIES)?;
     ids.truncate(page.limit + 1);
     let mut routes = Vec::with_capacity(ids.len());
     for id in ids {
-        let rec = db.route(id, false)?;
+        let rec = db.route_ref(id, false)?;
         let cidr = route_cidr(&rec);
         let mut obj = route_object(id, rec);
-        obj.relation = Some(route_relation(&cidr, prefix).to_owned());
+        obj.relation = Some(route_relation(&cidr, prefix));
         routes.push(obj);
     }
     let (items, next_cursor) = paginate_routes(routes, page.limit);
     Ok(PrefixResponse {
         meta: Some(ResponseMeta {
-            dataset: Some(dataset_meta_from_db(db)),
+            dataset: Some(Cow::Borrowed(meta)),
         }),
         prefix: PrefixDescriptor {
             cidr: prefix.canonical.clone(),
@@ -84,16 +88,16 @@ fn route_relation(cidr: &str, query: &ParsedPrefix) -> &'static str {
     "more_specific"
 }
 
-fn covering_allocation(
-    db: &Db,
+fn covering_allocation<'a>(
+    db: &'a Db,
     prefix: &ParsedPrefix,
-) -> Result<Option<AllocationObject>, ApiError> {
+) -> Result<Option<AllocationObject<'a>>, ApiError> {
     let ids = db.matching_prefix_ids(TableKind::Allocations, prefix.start, 0)?;
     let q_start = Address::from_ip(prefix.start);
     let q_end = Address::from_ip(prefix.end);
-    let mut best: Option<(u32, Allocation)> = None;
+    let mut best: Option<(u32, AllocationRef<'a>)> = None;
     for id in ids {
-        let rec = db.allocation(id, false)?;
+        let rec = db.allocation_ref(id, false)?;
         if rec.start > q_start || rec.end < q_end {
             continue;
         }
@@ -112,16 +116,17 @@ fn covering_allocation(
     Ok(best.map(|(id, rec)| allocation_object(id, rec)))
 }
 
-pub fn lookup_range(
-    db: &Db,
+pub(crate) fn lookup_range<'a>(
+    db: &'a Db,
+    meta: &'a DatasetMetadata,
     range: &ParsedRange,
     kind: RangeKind,
     page: &RangePage,
-) -> Result<RangeResponse, ApiError> {
+) -> Result<RangeResponse<'a>, ApiError> {
     let (entries, next_cursor) = range_page_entries(db, range, kind, page)?;
     let mut resp = RangeResponse {
         meta: Some(ResponseMeta {
-            dataset: Some(dataset_meta_from_db(db)),
+            dataset: Some(Cow::Borrowed(meta)),
         }),
         range: range_descriptor(range),
         kind,
@@ -133,23 +138,26 @@ pub fn lookup_range(
     };
     if kind == RangeKind::Allocations {
         for entry in entries {
-            resp.allocations
-                .push(allocation_object(entry.id, db.allocation(entry.id, false)?));
+            resp.allocations.push(allocation_object(
+                entry.id,
+                db.allocation_ref(entry.id, false)?,
+            ));
         }
     } else {
         for entry in entries {
             resp.routes
-                .push(route_object(entry.id, db.route(entry.id, false)?));
+                .push(route_object(entry.id, db.route_ref(entry.id, false)?));
         }
     }
     Ok(resp)
 }
 
-pub fn lookup_range_summary(
-    db: &Db,
+pub(crate) fn lookup_range_summary<'a>(
+    db: &'a Db,
+    meta: &'a DatasetMetadata,
     range: &ParsedRange,
     kind: RangeKind,
-) -> Result<RangeResponse, ApiError> {
+) -> Result<RangeResponse<'a>, ApiError> {
     let Some((v4, len)) = summary_prefix_key(range) else {
         return Err(ApiError::Internal(
             "range is not eligible for generated summary".into(),
@@ -174,7 +182,7 @@ pub fn lookup_range_summary(
         .collect();
     Ok(RangeResponse {
         meta: Some(ResponseMeta {
-            dataset: Some(dataset_meta_from_db(db)),
+            dataset: Some(Cow::Borrowed(meta)),
         }),
         range: range_descriptor(range),
         kind,
@@ -203,10 +211,10 @@ fn range_descriptor(v: &ParsedRange) -> RangeDescriptor {
     }
 }
 
-pub(crate) fn paginate_routes(
-    mut items: Vec<RouteObject>,
+pub(crate) fn paginate_routes<'a>(
+    mut items: Vec<RouteObject<'a>>,
     limit: usize,
-) -> (Vec<RouteObject>, Option<String>) {
+) -> (Vec<RouteObject<'a>>, Option<String>) {
     if items.len() <= limit {
         return (items, None);
     }

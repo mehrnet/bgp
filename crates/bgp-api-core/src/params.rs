@@ -1,24 +1,27 @@
-use std::collections::HashMap;
+use std::borrow::Cow;
 
 use crate::resource_model::RangeKind;
 use crate::resources::{Page, RangePage};
 use crate::service::ApiError;
 
-pub(crate) fn parse_query_map(query: &str) -> HashMap<String, String> {
-    let mut map = HashMap::new();
+pub(crate) fn query_param<'a>(query: &'a str, target: &str) -> Option<Cow<'a, str>> {
     for pair in query.split('&') {
         if pair.is_empty() {
             continue;
         }
         let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        map.entry(percent_decode(k))
-            .or_insert_with(|| percent_decode(v));
+        if percent_decode(k).as_ref() == target {
+            return Some(percent_decode(v));
+        }
     }
-    map
+    None
 }
 
-fn percent_decode(input: &str) -> String {
+fn percent_decode(input: &str) -> Cow<'_, str> {
     let bytes = input.as_bytes();
+    if !bytes.iter().any(|&b| b == b'%' || b == b'+') {
+        return Cow::Borrowed(input);
+    }
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while let Some(&b) = bytes.get(i) {
@@ -36,7 +39,7 @@ fn percent_decode(input: &str) -> String {
             i += 1;
         }
     }
-    String::from_utf8_lossy(&out).into_owned()
+    Cow::Owned(String::from_utf8_lossy(&out).into_owned())
 }
 
 fn hex_val(b: u8) -> Option<u8> {
@@ -48,50 +51,51 @@ fn hex_val(b: u8) -> Option<u8> {
     }
 }
 
-pub(crate) fn parse_page(q: &HashMap<String, String>) -> Result<Page, ApiError> {
+fn parse_limit_str(raw: &str) -> Result<usize, ApiError> {
+    raw.parse()
+        .ok()
+        .filter(|&v| (1..=100).contains(&v))
+        .ok_or_else(|| ApiError::BadRequest {
+            code: "INVALID_LIMIT",
+            message: "limit must be between 1 and 100".into(),
+        })
+}
+
+pub(crate) fn parse_page(query: &str) -> Result<Page, ApiError> {
     let mut page = Page {
         cursor: 0,
         limit: 50,
         number: 0,
         numbered: false,
     };
-    if let Some(raw) = q.get("limit").filter(|s| !s.is_empty()) {
-        let limit: usize = raw
+    if let Some(raw) = query_param(query, "limit").filter(|s| !s.is_empty()) {
+        page.limit = parse_limit_str(&raw)?;
+    }
+    if let Some(raw) = query_param(query, "cursor").filter(|s| !s.is_empty()) {
+        page.cursor = raw
             .parse()
             .ok()
-            .filter(|&v| (1..=100).contains(&v))
+            .filter(|&v| v >= 0)
             .ok_or_else(|| ApiError::BadRequest {
-                code: "INVALID_LIMIT",
-                message: "limit must be between 1 and 100".into(),
+                code: "INVALID_CURSOR",
+                message: "cursor must be a non-negative record cursor".into(),
             })?;
-        page.limit = limit;
-    }
-    if let Some(raw) = q.get("cursor").filter(|s| !s.is_empty()) {
-        let cursor: i64 =
-            raw.parse()
-                .ok()
-                .filter(|&v| v >= 0)
-                .ok_or_else(|| ApiError::BadRequest {
-                    code: "INVALID_CURSOR",
-                    message: "cursor must be a non-negative record cursor".into(),
-                })?;
-        page.cursor = cursor;
     }
     Ok(page)
 }
 
-pub(crate) fn parse_asn_page(q: &HashMap<String, String>) -> Result<Page, ApiError> {
-    let mut page = parse_page(q)?;
-    let Some(raw_page) = q.get("page").filter(|s| !s.is_empty()) else {
+pub(crate) fn parse_asn_page(query: &str) -> Result<Page, ApiError> {
+    let mut page = parse_page(query)?;
+    let Some(raw_page) = query_param(query, "page").filter(|s| !s.is_empty()) else {
         return Ok(page);
     };
-    if q.get("cursor").is_some_and(|s| !s.is_empty()) {
+    if query_param(query, "cursor").is_some_and(|s| !s.is_empty()) {
         return Err(ApiError::BadRequest {
             code: "INVALID_PAGINATION",
             message: "page and cursor cannot be used together".into(),
         });
     }
-    let number: usize = raw_page
+    page.number = raw_page
         .parse()
         .ok()
         .filter(|&v| (1..=100_000).contains(&v))
@@ -99,24 +103,18 @@ pub(crate) fn parse_asn_page(q: &HashMap<String, String>) -> Result<Page, ApiErr
             code: "INVALID_PAGE",
             message: "page must be between 1 and 100000".into(),
         })?;
-    page.number = number;
     page.numbered = true;
     Ok(page)
 }
 
-pub(crate) fn parse_range_page(q: &HashMap<String, String>) -> Result<RangePage, ApiError> {
-    let mut limit = 50usize;
-    if let Some(raw) = q.get("limit").filter(|s| !s.is_empty()) {
-        limit = raw
-            .parse()
-            .ok()
-            .filter(|&v| (1..=100).contains(&v))
-            .ok_or_else(|| ApiError::BadRequest {
-                code: "INVALID_LIMIT",
-                message: "limit must be between 1 and 100".into(),
-            })?;
-    }
-    let cursor = q.get("cursor").cloned().unwrap_or_default();
+pub(crate) fn parse_range_page(query: &str) -> Result<RangePage, ApiError> {
+    let limit = match query_param(query, "limit").filter(|s| !s.is_empty()) {
+        Some(raw) => parse_limit_str(&raw)?,
+        None => 50,
+    };
+    let cursor = query_param(query, "cursor")
+        .map(Cow::into_owned)
+        .unwrap_or_default();
     if cursor.len() > 256 {
         return Err(ApiError::BadRequest {
             code: "INVALID_CURSOR",
@@ -126,8 +124,8 @@ pub(crate) fn parse_range_page(q: &HashMap<String, String>) -> Result<RangePage,
     Ok(RangePage { cursor, limit })
 }
 
-pub(crate) fn parse_range_kind(q: &HashMap<String, String>) -> Result<RangeKind, ApiError> {
-    match q.get("kind").map(String::as_str).unwrap_or("") {
+pub(crate) fn parse_range_kind(query: &str) -> Result<RangeKind, ApiError> {
+    match query_param(query, "kind").as_deref().unwrap_or("") {
         "" | "allocations" => Ok(RangeKind::Allocations),
         "routes" => Ok(RangeKind::Routes),
         _ => Err(ApiError::BadRequest {
@@ -138,8 +136,13 @@ pub(crate) fn parse_range_kind(q: &HashMap<String, String>) -> Result<RangeKind,
 }
 
 pub(crate) fn parse_asn_query(input: &str) -> Result<u32, ApiError> {
-    let trimmed = input.trim().to_ascii_uppercase();
-    let num_str = trimmed.strip_prefix("AS").unwrap_or(&trimmed);
+    let trimmed = input.trim();
+    let num_str = trimmed
+        .strip_prefix("AS")
+        .or_else(|| trimmed.strip_prefix("as"))
+        .or_else(|| trimmed.strip_prefix("As"))
+        .or_else(|| trimmed.strip_prefix("aS"))
+        .unwrap_or(trimmed);
     num_str
         .parse::<u32>()
         .ok()

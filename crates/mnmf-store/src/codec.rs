@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::types::StoreError;
 
 #[inline]
@@ -23,7 +25,7 @@ pub(crate) struct StringPool<'a> {
 }
 
 impl<'a> StringPool<'a> {
-    pub(crate) fn new(offsets: &'a [u8], data: &'a [u8]) -> Result<Self, StoreError> {
+    pub(crate) fn validate_and_count(offsets: &'a [u8], data: &'a [u8]) -> Result<u64, StoreError> {
         if offsets.len() < 8 || !offsets.len().is_multiple_of(8) {
             return Err(StoreError::InvalidFormat(
                 "invalid string pool offsets".into(),
@@ -38,14 +40,23 @@ impl<'a> StringPool<'a> {
                 "string pool length mismatch".into(),
             ));
         }
-        Ok(Self {
+        Ok(count)
+    }
+
+    pub(crate) fn from_validated(offsets: &'a [u8], data: &'a [u8], count: u64) -> Self {
+        Self {
             offsets,
             data,
             count,
-        })
+        }
     }
 
-    pub(crate) fn get_str(&self, id: u64) -> Result<String, StoreError> {
+    pub(crate) fn new(offsets: &'a [u8], data: &'a [u8]) -> Result<Self, StoreError> {
+        let count = Self::validate_and_count(offsets, data)?;
+        Ok(Self::from_validated(offsets, data, count))
+    }
+
+    pub(crate) fn get_cow(&self, id: u64) -> Result<Cow<'a, str>, StoreError> {
         if id >= self.count {
             return Err(StoreError::InvalidFormat(
                 "string pool ID out of range".into(),
@@ -68,7 +79,7 @@ impl<'a> StringPool<'a> {
             .data
             .get(start..end)
             .ok_or_else(|| StoreError::InvalidFormat("string pool slice out of bounds".into()))?;
-        Ok(String::from_utf8_lossy(bytes).into_owned())
+        Ok(String::from_utf8_lossy(bytes))
     }
 }
 
@@ -133,21 +144,25 @@ impl<'a> Reader<'a> {
         Ok(crate::types::Address(out))
     }
 
-    pub(crate) fn inline_str(&mut self) -> Result<String, StoreError> {
+    pub(crate) fn inline_cow(&mut self) -> Result<Cow<'a, str>, StoreError> {
         let len = usize::try_from(self.uvarint()?)
             .map_err(|_| StoreError::InvalidFormat("string length overflow".into()))?;
         if len == 0 {
-            return Ok(String::new());
+            return Ok(Cow::Borrowed(""));
         }
         let bytes = self.take(len)?;
-        Ok(String::from_utf8_lossy(bytes).into_owned())
+        Ok(String::from_utf8_lossy(bytes))
     }
 
-    pub(crate) fn pooled_str(&mut self, pool: &StringPool<'_>) -> Result<String, StoreError> {
+    pub(crate) fn inline_str(&mut self) -> Result<String, StoreError> {
+        self.inline_cow().map(Cow::into_owned)
+    }
+
+    pub(crate) fn pooled_cow(&mut self, pool: &StringPool<'a>) -> Result<Cow<'a, str>, StoreError> {
         match self.uvarint()? {
-            0 => Ok(String::new()),
-            1 => self.inline_str(),
-            tag => pool.get_str(tag - 2),
+            0 => Ok(Cow::Borrowed("")),
+            1 => self.inline_cow(),
+            tag => pool.get_cow(tag - 2),
         }
     }
 

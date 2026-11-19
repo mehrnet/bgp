@@ -20,3 +20,6 @@ hyper-util = { workspace = true }
 mnmf-store = { path = "../mnmf-store" }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+
+[target.'cfg(all(target_os = "linux", target_env = "musl", target_arch = "x86_64"))'.dependencies]
+tikv-jemallocator = "0.6"
