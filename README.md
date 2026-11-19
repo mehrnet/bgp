@@ -45,7 +45,7 @@ Because `bgp-api` maps the immutable `MNMF` database (~`4.1 GiB` uncompressed) d
 Bare-metal installation binds the API to `127.0.0.1:3102`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp-api/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp/main/install.sh | sudo bash
 ```
 
 ### HTTPS with Caddy
@@ -54,14 +54,14 @@ Create a DNS record for the server, then pass the hostname. Caddy is installed a
 managed automatically:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp-api/main/install.sh | \
+curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp/main/install.sh | \
   sudo bash -s -- --domain bgp-api.example.com
 ```
 
 Add `--auto-update` to schedule a verified release check at **06:00 UTC**:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp-api/main/install.sh | \
+curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp/main/install.sh | \
   sudo bash -s -- --domain bgp-api.example.com --auto-update
 ```
 
@@ -159,7 +159,7 @@ sudo /srv/bgp-api/install.sh --uninstall --purge
 If the local installer is unavailable:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp-api/main/install.sh | \
+curl -fsSL https://raw.githubusercontent.com/mehrnet/bgp/main/install.sh | \
   sudo bash -s -- --uninstall
 ```
 
@@ -263,6 +263,7 @@ Repository layout:
 - `crates/bgp-sqlite`: SQLite export builder, indexer, summary generator, and validator
 - `crates/bgp-tools`: pipeline tools (`parse-rir`, `fetch-geofeeds`, `build-mmap-dataset`, `build-country-db`, `build-lite-db`, `benchmark-http`)
 - `lite/`: standalone Cloudflare Worker for `bgp-lite.mehrnet.com`
+- `web/`: SolidJS + TypeScript web frontend for `bgp.mehrnet.com`
 
 Run the API against a local dataset:
 
@@ -311,4 +312,5 @@ cargo run --release -p bgp-sqlite --bin validate-database -- -indexed mehrnet_bg
 shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
 npm --prefix lite test
+npm --prefix web run check && npm --prefix web test && npm --prefix web run build
 ```

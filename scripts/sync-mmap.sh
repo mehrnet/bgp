@@ -5,7 +5,7 @@
 # use the same-port stop-and-replace fallback.
 set -Eeuo pipefail
 
-readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp-api}"
+readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp}"
 readonly DATA_DIR="${BGP_API_DATA_DIR:-/var/lib/bgp-api}"
 readonly PRIMARY_DATABASE_PATH="${BGP_API_PRIMARY_DATABASE_PATH:-${BGP_API_DATABASE_PATH:-$DATA_DIR/primary.mmap}}"
 readonly SECONDARY_DATABASE_PATH="${BGP_API_SECONDARY_DATABASE_PATH:-$DATA_DIR/secondary.mmap}"

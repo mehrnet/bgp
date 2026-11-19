@@ -2,7 +2,7 @@
 # Install, update, or remove the pre-indexed MehrNet BGP API runtime.
 set -Eeuo pipefail
 
-readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp-api}"
+readonly REPOSITORY="${BGP_API_GITHUB_REPOSITORY:-mehrnet/bgp}"
 readonly SOURCE_REF="${BGP_API_SOURCE_REF:-main}"
 readonly INSTALL_DIR="${BGP_API_INSTALL_DIR:-/srv/bgp-api}"
 readonly DATA_DIR="${BGP_API_DATA_DIR:-/var/lib/bgp-api}"
@@ -60,7 +60,7 @@ Options:
 
 Environment:
   BGP_API_GITHUB_TOKEN       Optional GitHub token for higher API limits.
-  BGP_API_GITHUB_REPOSITORY  Release repository (default: mehrnet/bgp-api).
+  BGP_API_GITHUB_REPOSITORY  Release repository (default: mehrnet/bgp).
   BGP_API_SOURCE_REF         Deployment-file ref (default: main).
   BGP_API_BLUE_GREEN         Set to 0 to force stop-and-replace updates.
 EOF
