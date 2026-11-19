@@ -77,12 +77,16 @@ describe("routing and endpoint paths", () => {
   it("formats API endpoint paths and code snippets", () => {
     assert.equal(
       buildEndpointPath({ kind: "ip", value: "1.1.1.1" }),
-      "/v1/ip/1.1.1.1?details=true"
+      "/v1/ip?query=1.1.1.1"
+    );
+    assert.equal(
+      buildEndpointPath({ kind: "cidr", value: "1.1.1.0/24" }),
+      "/v1/prefix?prefix=1.1.1.0%2F24"
     );
     assert.equal(
       buildEndpointPath({ kind: "asn", value: "AS13335", page: 2, limit: 25 }),
-      "/v1/asn/AS13335?limit=25&page=2"
+      "/v1/asn?query=AS13335&limit=25&page=2"
     );
-    assert.match(formatCodeSnippet("curl", "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1"), /curl -fsSL/);
+    assert.match(formatCodeSnippet("curl", "https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1"), /curl -fsSL/);
   });
 });

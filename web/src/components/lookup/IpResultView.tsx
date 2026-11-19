@@ -1,4 +1,5 @@
 import { For, Show, type JSX } from "solid-js";
+import { apiMode } from "../../lib/apiClient.ts";
 import { formatCoord, formatRange, networkAsns, parseCoord } from "../../lib/ip.ts";
 import type { LookupQuery, LookupResponse } from "../../types/api.ts";
 import { countryLabel } from "../ui/CountryFlag.tsx";
@@ -82,13 +83,15 @@ function routeFields(data: LookupResponse, onNavigate: (q: LookupQuery) => void)
 
 function allocationFields(data: LookupResponse, onNavigate: (q: LookupQuery) => void) {
   const alloc = data.allocation;
+  const rangeLabel = formatRange(alloc?.start_ip, alloc?.end_ip);
+  const canQueryRange = alloc?.start_ip && alloc?.end_ip && apiMode() === "full";
   return [
     { label: "Network name", value: alloc?.name },
     {
       label: "Range",
-      value: alloc?.start_ip && alloc?.end_ip
-        ? <QueryLink query={{ kind: "range", start: alloc.start_ip, end: alloc.end_ip, rangeKind: "allocations" }} label={formatRange(alloc.start_ip, alloc.end_ip)} onNavigate={onNavigate} />
-        : "Unavailable"
+      value: canQueryRange
+        ? <QueryLink query={{ kind: "range", start: alloc.start_ip!, end: alloc.end_ip!, rangeKind: "allocations" }} label={rangeLabel} onNavigate={onNavigate} />
+        : rangeLabel
     },
     { label: "Date", value: data.allocation_date ?? alloc?.allocation_date },
     { label: "Status", value: data.allocation_status ?? alloc?.status },

@@ -12,6 +12,7 @@ export interface EndpointParam {
 export interface EndpointSpec {
   id: string;
   title: string;
+  availability: string;
   summary: string;
   method: "GET";
   pathTemplate: string;
@@ -36,81 +37,115 @@ export const LANGUAGE_OPTIONS: { id: DocLanguage; label: string; icon: string }[
 
 export const TIER_COMPARISON: TierRow[] = [
   {
-    feature: "Base URL",
-    full: "https://bgp-api.mehrnet.com",
-    lite: "https://bgp-lite.mehrnet.com"
+    feature: "IP lookup (/v1/ip?query=)",
+    full: "Full route, allocation, geofeed, WHOIS netname/abuse/dates, and ?details=full",
+    lite: "Route (cidr, asns, origins), /32 v4 & /64 v6 allocations, geofeed coords"
   },
   {
-    feature: "IP lookup (/v1/ip/{ip})",
-    full: "Full BGP, RIR, geolocation & lat/lng",
-    lite: "Full BGP, RIR, country & fallback"
+    feature: "Country shortcut (/v1/country)",
+    full: "Not available",
+    lite: "Plain-text ISO country code (or JSON with format=json)"
   },
   {
-    feature: "Prefix & ASN paging",
-    full: "Numbered & cursor pagination",
-    lite: "Cursor pagination"
+    feature: "ASN lookup (/v1/asn?query=)",
+    full: "Full aut-num record + paginated route objects with IRR metadata",
+    lite: "aut-num metadata (name, org, registry, country, abuse) + paginated prefixes"
   },
   {
-    feature: "Range query (/v1/range)",
-    full: "Records + /0–/16 range summaries",
-    lite: "Records (capped range window)"
+    feature: "Prefix lookup (/v1/prefix?prefix=)",
+    full: "Covering allocation + all overlapping IRR route objects",
+    lite: "Covering allocation + winning route objects"
+  },
+  {
+    feature: "Range lookup (/v1/range)",
+    full: "Broad /0–/16 summaries & cursor-paginated overlap scans",
+    lite: "Not available (returns 404)"
   }
+];
+
+export const DIRECTORY_LINKS: { href: string; method: string; path: string; note: string }[] = [
+  { href: "#api-ip", method: "GET", path: "/v1/ip?query={address}", note: "IPv4 or IPv6 address (Full & Lite)" },
+  { href: "#api-prefix", method: "GET", path: "/v1/prefix?prefix={cidr}", note: "Allocation & route objects (Full & Lite)" },
+  { href: "#api-range", method: "GET", path: "/v1/range?start={ip}&end={ip}", note: "Overlapping blocks or routes (Full only)" },
+  { href: "#api-asn", method: "GET", path: "/v1/asn?query={asn}", note: "Aut-num record & prefixes (Full & Lite)" },
+  { href: "#api-country", method: "GET", path: "/v1/country?query={address}", note: "Plain-text or JSON country code (Lite only)" },
+  { href: "#api-overview", method: "GET", path: "/v1/health", note: "Service health and dataset metadata (Full & Lite)" }
 ];
 
 export const ENDPOINT_SPECS: EndpointSpec[] = [
   {
     id: "api-ip",
     title: "IP address lookup",
-    summary: "Resolve BGP origin ASN, CIDR allocation, and geolocation for any IPv4 or IPv6 address.",
+    availability: "Full & Lite API",
+    summary: "Resolve an IPv4 or IPv6 address into its best matching route, allocation, ASN, and geolocation.",
     method: "GET",
-    pathTemplate: "/v1/ip/{ip}",
-    exampleUrl: "https://bgp-api.mehrnet.com/v1/ip/1.1.1.1?details=true",
+    pathTemplate: "/v1/ip?query={address}",
+    exampleUrl: "https://bgp-api.mehrnet.com/v1/ip?query=1.1.1.1",
     parameters: [
-      { name: "ip", location: "path", required: true, description: "IPv4 or IPv6 address to inspect." },
-      { name: "details", location: "query", required: false, description: "Set true to include underlying source records." }
+      { name: "query", location: "query", required: true, description: "IPv4 or IPv6 address." },
+      { name: "details", location: "query", required: false, description: "Set full (Full API) to return raw matched source records." }
     ],
     responseJson: EXAMPLE_RESPONSES.ip
   },
   {
     id: "api-prefix",
     title: "CIDR prefix lookup",
-    summary: "Inspect covering RIR allocation and announced origin routes for an IPv4 or IPv6 prefix.",
+    availability: "Full & Lite API",
+    summary: "Inspect covering RIR allocation and registered route objects for an IPv4 or IPv6 CIDR.",
     method: "GET",
-    pathTemplate: "/v1/prefix/{ip}/{prefix}",
-    exampleUrl: "https://bgp-api.mehrnet.com/v1/prefix/1.1.1.0/24",
+    pathTemplate: "/v1/prefix?prefix={cidr}",
+    exampleUrl: "https://bgp-api.mehrnet.com/v1/prefix?prefix=1.1.1.0%2F24&limit=10",
     parameters: [
-      { name: "ip", location: "path", required: true, description: "Network base IP address." },
-      { name: "prefix", location: "path", required: true, description: "Prefix length (0–32 IPv4, 0–128 IPv6)." },
-      { name: "cursor", location: "query", required: false, description: "Pagination token from routes.next_cursor." }
+      { name: "prefix", location: "query", required: true, description: "IPv4 or IPv6 CIDR block." },
+      { name: "limit", location: "query", required: false, description: "1–100 route items per page." },
+      { name: "cursor", location: "query", required: false, description: "Continuation cursor from routes.next_cursor." }
     ],
     responseJson: EXAMPLE_RESPONSES.prefix
   },
   {
     id: "api-range",
-    title: "IP range lookup",
-    summary: "Query RIR allocations or BGP routes inside an inclusive IPv4 or IPv6 address range.",
+    title: "Range lookup",
+    availability: "Full API only",
+    summary: "Find allocations or route objects overlapping an explicit inclusive start and end address.",
     method: "GET",
-    pathTemplate: "/v1/range",
-    exampleUrl: "https://bgp-api.mehrnet.com/v1/range?start=1.1.1.0&end=1.1.1.255&kind=allocations",
+    pathTemplate: "/v1/range?start={ip}&end={ip}",
+    exampleUrl: "https://bgp-api.mehrnet.com/v1/range?start=1.1.1.0&end=1.1.1.255&kind=routes&limit=10",
     parameters: [
-      { name: "start", location: "query", required: true, description: "Inclusive start IP address." },
-      { name: "end", location: "query", required: true, description: "Inclusive end IP address (same IP family)." },
-      { name: "kind", location: "query", required: false, description: "allocations (default) or routes." }
+      { name: "start", location: "query", required: true, description: "Range start IP address." },
+      { name: "end", location: "query", required: true, description: "Range end IP address." },
+      { name: "kind", location: "query", required: false, description: "allocations (default) or routes." },
+      { name: "limit", location: "query", required: false, description: "1–100 items per page." }
     ],
     responseJson: EXAMPLE_RESPONSES.range
   },
   {
     id: "api-asn",
     title: "ASN lookup",
-    summary: "Retrieve autonomous system metadata and paginated announced prefixes.",
+    availability: "Full & Lite API",
+    summary: "Fetch an autonomous system aut-num record and paginated registered route objects.",
     method: "GET",
-    pathTemplate: "/v1/asn/{asn}",
-    exampleUrl: "https://bgp-api.mehrnet.com/v1/asn/AS13335?page=1&limit=50",
+    pathTemplate: "/v1/asn?query={asn}",
+    exampleUrl: "https://bgp-api.mehrnet.com/v1/asn?query=AS13335&limit=10&page=1",
     parameters: [
-      { name: "asn", location: "path", required: true, description: "AS number with or without AS prefix." },
-      { name: "page", location: "query", required: false, description: "1-based page number when counts are available." },
-      { name: "limit", location: "query", required: false, description: "Maximum routes per page (default 50, max 250)." }
+      { name: "query", location: "query", required: true, description: "AS number with or without AS prefix." },
+      { name: "limit", location: "query", required: false, description: "1–100 routes per page." },
+      { name: "page", location: "query", required: false, description: "1-based page number (Full & Lite). Do not combine with cursor." },
+      { name: "cursor", location: "query", required: false, description: "Continuation cursor." }
     ],
     responseJson: EXAMPLE_RESPONSES.asn
+  },
+  {
+    id: "api-country",
+    title: "Country shortcut (Lite edge worker)",
+    availability: "Lite API only",
+    summary: "Low-latency ISO 3166-1 alpha-2 country lookup via bgp-lite.mehrnet.com (defaults to caller IP).",
+    method: "GET",
+    pathTemplate: "/v1/country?query={address}",
+    exampleUrl: "https://bgp-lite.mehrnet.com/v1/country?query=1.1.1.1&format=json",
+    parameters: [
+      { name: "query", location: "query", required: false, description: "IPv4 or IPv6 address (defaults to connecting client IP)." },
+      { name: "format", location: "query", required: false, description: "Use json for JSON payload instead of plain text country code." }
+    ],
+    responseJson: EXAMPLE_RESPONSES.country
   }
 ];

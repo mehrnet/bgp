@@ -12,13 +12,13 @@ export function NavHeader(props: NavHeaderProps): JSX.Element {
   return (
     <header class="nav">
       <div class="nav-inner">
-        <a class="brand" href="/my-ip" onClick={props.onOpenHome}>
+        <a class="brand" href="/my-ip" aria-label="MehrBGP home" onClick={props.onOpenHome}>
           <Icon id="icon-bgp-mark" class="brand-mark" />
           <span class="brand-copy">
             <span class="brand-name">
-              Mehrnet <span>BGP</span>
+              Mehr<span>BGP</span>
             </span>
-            <span class="brand-byline">Routing &amp; RIR explorer</span>
+            <span class="brand-byline">by mehrnet</span>
           </span>
         </a>
         <div class="nav-actions">
@@ -36,8 +36,8 @@ export function NavHeader(props: NavHeaderProps): JSX.Element {
             aria-current={props.currentView === "home" ? "page" : undefined}
             onClick={props.onOpenHome}
           >
-            <Icon id="icon-search" />
-            <span>Explorer</span>
+            <Icon id="icon-target" />
+            <span>My IP</span>
           </a>
           <a
             class="api-link"
@@ -45,7 +45,7 @@ export function NavHeader(props: NavHeaderProps): JSX.Element {
             aria-current={props.currentView === "api" ? "page" : undefined}
             onClick={props.onOpenApi}
           >
-            <Icon id="icon-terminal" />
+            <Icon id="icon-book-open" />
             <span>API Docs</span>
           </a>
         </div>

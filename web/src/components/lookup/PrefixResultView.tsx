@@ -1,4 +1,5 @@
 import { Show, type JSX } from "solid-js";
+import { apiMode } from "../../lib/apiClient.ts";
 import { formatRange } from "../../lib/ip.ts";
 import type { LookupQuery, PrefixResponse } from "../../types/api.ts";
 import { countryLabel } from "../ui/CountryFlag.tsx";
@@ -78,11 +79,15 @@ export function PrefixResultView(props: PrefixResultViewProps): JSX.Element {
         rightLabel="Covering allocation"
         rightHeading={props.data.allocation?.name ?? "Unassigned / Multiple"}
         rightSubtitle={
-          <QueryLink
-            query={{ kind: "range", start: props.data.prefix.start_ip, end: props.data.prefix.end_ip, rangeKind: "allocations" }}
-            label={formatRange(props.data.prefix.start_ip, props.data.prefix.end_ip)}
-            onNavigate={props.onNavigate}
-          />
+          apiMode() === "full" ? (
+            <QueryLink
+              query={{ kind: "range", start: props.data.prefix.start_ip, end: props.data.prefix.end_ip, rangeKind: "allocations" }}
+              label={formatRange(props.data.prefix.start_ip, props.data.prefix.end_ip)}
+              onNavigate={props.onNavigate}
+            />
+          ) : (
+            <span>{formatRange(props.data.prefix.start_ip, props.data.prefix.end_ip)}</span>
+          )
         }
       />
       <PrefixPanels data={props.data} onNavigate={props.onNavigate} />

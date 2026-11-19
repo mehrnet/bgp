@@ -1,11 +1,10 @@
 name: Deploy Web UI
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - "web/**"
-      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
 permissions:
@@ -18,18 +17,35 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+      - name: Check if web UI files changed
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD^ HEAD -- web/ .github/workflows/deploy-web.yml | grep -q .; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.deploy == 'true'
         with:
           node-version: "24"
       - name: Install, verify, and build web app
+        if: steps.changes.outputs.deploy == 'true'
         run: |
           npm --prefix web ci
           npm --prefix web run check
           npm --prefix web test
           npm --prefix web run build
       - name: Deploy Cloudflare Worker (mehrnet-bgp)
+        if: steps.changes.outputs.deploy == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

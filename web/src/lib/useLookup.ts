@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 import type { ApiPayload, LookupQuery } from "../types/api.ts";
-import { fetchLookup, IPV4_PROVIDERS, raceAddressProviders } from "./apiClient.ts";
+import { detectOptionalIpv6, detectVisitorIps, fetchLookup } from "./apiClient.ts";
 import { normalizeQueryLabel } from "./ip.ts";
 
 interface TaskRefs {
@@ -14,7 +14,7 @@ async function runQueryTask(query: LookupQuery, isMyIp: boolean, signal: AbortSi
   refs.setLoading(true);
   refs.setError(null);
   refs.setInput(normalizeQueryLabel(query));
-  document.title = isMyIp ? "Mehrnet BGP — Your IP Lookup" : `${normalizeQueryLabel(query)} — Mehrnet BGP`;
+  document.title = isMyIp ? "MehrBGP — My IP" : `${normalizeQueryLabel(query)} — MehrBGP`;
   try {
     const result = await fetchLookup(query, signal);
     if (!signal.aborted) refs.setPayload(result);
@@ -33,7 +33,9 @@ export function createLookupState() {
   const [loading, setLoading] = createSignal(false);
   const [lookupError, setLookupError] = createSignal<string | null>(null);
   const [payload, setPayload] = createSignal<ApiPayload | null>(null);
+  const [ipv6, setIpv6] = createSignal<string | null>(null);
   let activeAbort: AbortController | null = null;
+  let ipv6Checked = false;
   const refs: TaskRefs = { setInput: setInputValue, setLoading, setError: setLookupError, setPayload };
 
   const executeLookup = async (query: LookupQuery, isMyIp: boolean) => {
@@ -46,13 +48,15 @@ export function createLookupState() {
     setLoading(true);
     setLookupError(null);
     try {
-      const ip = await raceAddressProviders(IPV4_PROVIDERS);
-      await executeLookup({ kind: "ip", value: ip }, true);
+      const { primary, ipv6: traceV6 } = await detectVisitorIps();
+      if (traceV6) { setIpv6(traceV6); ipv6Checked = true; }
+      else if (!ipv6Checked) { ipv6Checked = true; void detectOptionalIpv6().then(setIpv6).catch(() => undefined); }
+      await executeLookup({ kind: "ip", value: primary }, true);
     } catch {
       setLoading(false);
       setLookupError("Unable to detect your public IP address automatically.");
     }
   };
 
-  return { inputValue, setInputValue, loading, lookupError, payload, executeLookup, detectPublicIp, abort: () => activeAbort?.abort() };
+  return { inputValue, setInputValue, loading, lookupError, payload, ipv6, executeLookup, detectPublicIp, abort: () => activeAbort?.abort() };
 }

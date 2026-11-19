@@ -6,8 +6,11 @@ interface IconProps {
 }
 
 export function Icon(props: IconProps): JSX.Element {
+  const viewBox = () =>
+    props.id === "icon-bgp-mark" ? "0 0 32 32" : "0 0 24 24";
+
   return (
-    <svg class={props.class} aria-hidden="true">
+    <svg class={props.class} viewBox={viewBox()} aria-hidden="true">
       <use href={`/icons.svg#${props.id}`} />
     </svg>
   );

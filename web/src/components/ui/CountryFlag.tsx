@@ -21,14 +21,14 @@ export function countryLabel(code?: string | null): string | null {
 
 export function CountryFlag(props: CountryFlagProps): JSX.Element {
   const normalized = () => {
-    const raw = props.code?.trim().toUpperCase() ?? "";
-    return /^[A-Z]{2}$/.test(raw) ? raw : null;
+    const raw = props.code?.trim().toLowerCase() ?? "";
+    return /^[a-z]{2}$/.test(raw) ? raw : null;
   };
 
   return (
     <Show when={normalized()}>
       {(cc) => (
-        <svg class="country-flag" aria-hidden="true">
+        <svg class="country-flag" viewBox="0 0 640 480" aria-hidden="true">
           <use href={`/icons.svg#flag-${cc()}`} />
         </svg>
       )}

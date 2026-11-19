@@ -302,11 +302,16 @@
   line-height: 1.4;
 }
 
-.api-endpoint-line span {
+.api-endpoint-line > span:first-child {
   flex: 0 0 auto;
   color: var(--accent);
   font-size: 0.6875rem;
   font-weight: 750;
+}
+
+.endpoint-tier {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .api-endpoint-line code,

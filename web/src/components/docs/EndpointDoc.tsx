@@ -56,6 +56,7 @@ export function EndpointDoc(props: EndpointDocProps): JSX.Element {
         <div class="api-endpoint-line">
           <span>{props.spec.method}</span>
           <code>{props.spec.pathTemplate}</code>
+          <span class="meta-chip endpoint-tier">{props.spec.availability}</span>
         </div>
         <ParameterTable parameters={props.spec.parameters} />
         <div class="api-operation">

@@ -3,7 +3,6 @@ import { ApiDocsView } from "./components/docs/ApiDocsView.tsx";
 import { NavHeader } from "./components/layout/NavHeader.tsx";
 import { LookupResult } from "./components/lookup/LookupResult.tsx";
 import { SearchBar } from "./components/lookup/SearchBar.tsx";
-import { IPV6_PROVIDERS, raceAddressProviders } from "./lib/apiClient.ts";
 import { classifyQuery } from "./lib/ip.ts";
 import { parseRoute, queryToPath, type RouteState } from "./lib/routes.ts";
 import { createLookupState } from "./lib/useLookup.ts";
@@ -12,10 +11,10 @@ import type { LookupQuery } from "./types/api.ts";
 function PageHeading(props: { view: "home" | "api" }): JSX.Element {
   return (
     <header class="page-header" classList={{ "api-header": props.view === "api" }}>
-      <p class="kicker">{props.view === "api" ? "Developer reference" : "BGP & RIR explorer"}</p>
-      <h1>{props.view === "api" ? "Mehrnet BGP REST API" : "IP, prefix & ASN intelligence"}</h1>
+      <p class="kicker">{props.view === "api" ? "Public API / field manual" : "Network intelligence"}</p>
+      <h1>{props.view === "api" ? "MehrBGP REST API" : "Network lookup"}</h1>
       <Show when={props.view === "api"}>
-        <p>Query live RouteViews BGP tables, RIR allocations, and geofeed coordinates directly over HTTPS.</p>
+        <p>Two compatible endpoints for address, prefix, range, and ASN intelligence. JSON over HTTPS, built from MehrNet's routing dataset.</p>
       </Show>
     </header>
   );
@@ -27,7 +26,7 @@ function useRouter(lookup: ReturnType<typeof createLookupState>) {
 
   const applyRoute = (next: RouteState) => {
     setRoute(next);
-    if (next.view === "api") { document.title = "API Documentation — Mehrnet BGP"; return; }
+    if (next.view === "api") { document.title = "MehrBGP API Documentation"; return; }
     if (next.isMyIp || !next.query) {
       if (["/", "/home"].includes(window.location.pathname)) window.history.replaceState(null, "", "/my-ip");
       void lookup.detectPublicIp();
@@ -60,7 +59,6 @@ function createToast() {
 }
 
 export function App(): JSX.Element {
-  const [ipv6, setIpv6] = createSignal<string | null>(null);
   const lookup = createLookupState();
   const router = useRouter(lookup);
   const { toast, showToast } = createToast();
@@ -70,13 +68,12 @@ export function App(): JSX.Element {
     window.addEventListener("popstate", onPop);
     onCleanup(() => { window.removeEventListener("popstate", onPop); lookup.abort(); });
     router.applyRoute(router.route());
-    void raceAddressProviders(IPV6_PROVIDERS).then(setIpv6).catch(() => undefined);
   });
 
   const submitSearch = () => {
     const q = classifyQuery(lookup.inputValue());
     if (q) router.navigate(q);
-    else router.setInputError("Enter a valid IPv4/IPv6 address, CIDR prefix, AS number, or range.");
+    else router.setInputError("Enter an IP address, CIDR, range, or AS number.");
   };
 
   return (
@@ -91,7 +88,7 @@ export function App(): JSX.Element {
             onSubmit={submitSearch}
             onMyIp={() => router.openRoute("home")}
             error={router.inputError()}
-            ipv6Candidate={ipv6()}
+            ipv6Candidate={lookup.ipv6()}
             onSelectIpv6={(ip) => router.navigate({ kind: "ip", value: ip })}
           />
           <LookupResult loading={lookup.loading()} error={lookup.lookupError()} payload={lookup.payload()} isMyIp={router.route().isMyIp} onNavigate={router.navigate} onCopied={showToast} />

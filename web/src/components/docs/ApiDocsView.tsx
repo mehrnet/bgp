@@ -1,5 +1,6 @@
 import { createSignal, For, onMount, type JSX } from "solid-js";
 import {
+  DIRECTORY_LINKS,
   ENDPOINT_SPECS,
   LANGUAGE_OPTIONS,
   TIER_COMPARISON,
@@ -14,9 +15,7 @@ function readStoredLanguage(): DocLanguage {
   try {
     const raw = localStorage.getItem(LANG_KEY);
     if (LANGUAGE_OPTIONS.some((opt) => opt.id === raw)) return raw as DocLanguage;
-  } catch {
-    // Ignore storage errors.
-  }
+  } catch { /* ignore */ }
   return "curl";
 }
 
@@ -25,22 +24,21 @@ function EndpointDirectory(): JSX.Element {
     <section class="api-section">
       <div class="api-section-heading">
         <p class="kicker">Endpoints</p>
-        <h2>Available resources</h2>
+        <h2>Lookup resources</h2>
       </div>
       <div class="api-endpoints">
-        <For each={ENDPOINT_SPECS}>
-          {(spec) => (
-            <a href={`#${spec.id}`}>
-              <span class="endpoint-method">{spec.method}</span>
-              <code>{spec.pathTemplate}</code>
-              <span>{spec.summary}</span>
+        <For each={DIRECTORY_LINKS}>
+          {(item) => (
+            <a href={item.href}>
+              <span class="endpoint-method">{item.method}</span>
+              <code>{item.path}</code>
+              <span>{item.note}</span>
             </a>
           )}
         </For>
       </div>
       <p class="api-note">
-        The UI probes <code>/v1/health</code> on the Full API and fails over to{" "}
-        <code>https://bgp-lite.mehrnet.com</code> for 30 minutes if unreachable.
+        Both <code>bgp-api.mehrnet.com</code> (Full) and <code>bgp-lite.mehrnet.com</code> (Edge Lite) share compatible lookup schemas. When Full API health fails, this UI automatically fails over to Lite.
       </p>
     </section>
   );
@@ -50,15 +48,19 @@ function TierTable(): JSX.Element {
   return (
     <section class="api-section">
       <div class="api-section-heading">
-        <p class="kicker">Tiers</p>
-        <h2>Full API vs Lite Worker</h2>
+        <p class="kicker">Endpoints comparison</p>
+        <h2>Full API vs. Lite API</h2>
       </div>
       <div class="api-example">
         <div class="api-parameters api-parameters-flush">
           <div class="api-table-scroll" tabindex="0">
             <table>
               <thead>
-                <tr><th>Capability</th><th>Full API</th><th>Lite Worker</th></tr>
+                <tr>
+                  <th>Capability</th>
+                  <th><code>bgp-api.mehrnet.com</code> (Full)</th>
+                  <th><code>bgp-lite.mehrnet.com</code> (Lite)</th>
+                </tr>
               </thead>
               <tbody>
                 <For each={TIER_COMPARISON}>
@@ -88,20 +90,20 @@ export function ApiDocsView(props: { activeSection: string | null; onCopied: (ms
 
   return (
     <div class="api-view">
-      <div class="api-overview">
-        <span class="section-label"><Icon id="icon-terminal" /><span>Base URL</span></span>
-        <code>https://bgp-api.mehrnet.com</code>
-        <span>Unauthenticated read-only JSON API backed by RIR &amp; RouteViews data.</span>
+      <div id="api-overview" class="api-overview">
+        <span class="section-label"><Icon id="icon-globe" /><span>Base URLs</span></span>
+        <code>https://bgp-api.mehrnet.com · https://bgp-lite.mehrnet.com</code>
+        <span>No key, no client library. Use Full API for WHOIS &amp; range scans, or Lite Worker for edge lookups &amp; <code>/v1/country</code>.</span>
         <a class="openapi-link" href="/openapi.json" target="_blank" rel="noopener noreferrer">
-          <Icon id="icon-book-open" /><span>OpenAPI spec</span>
+          <Icon id="icon-book-open" /><span>OpenAPI JSON</span>
         </a>
       </div>
-      <EndpointDirectory />
       <TierTable />
+      <EndpointDirectory />
       <section class="api-section">
-        <div class="api-section-heading"><p class="kicker">Reference</p><h2>Interactive examples</h2></div>
+        <div class="api-section-heading"><p class="kicker">Services</p><h2>Interactive examples</h2></div>
         <div class="api-language-bar">
-          <span>Language</span>
+          <span>Example language</span>
           <div class="language-tabs" role="tablist" aria-label="Code language">
             <For each={LANGUAGE_OPTIONS}>
               {(opt) => (
