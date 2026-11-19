@@ -84,7 +84,7 @@ fields may be `null` only for old local fixtures or pre-metadata datasets.
 | `allocations` | IP range, IP version, RIR registry, country, `netname`, `status`, delegated allocation date, RPSL `created`, `last-modified`, `source`, `mnt-by`, `org`, direct `abuse-c`/`abuse-mailbox`, and `descr` |
 | `routes` | IP range, IP version, route CIDR, origin ASN, RIR registry, RPSL `source`, `mnt-by`, `org`, direct `abuse-c`/`abuse-mailbox`, and `descr` |
 | `autnums` | RPSL `aut-num`, `as-name`, country, status, provenance, maintainer, organization, direct `abuse-c`/`abuse-mailbox`, and description |
-| `geolocations` | IP range, IP version, country, region, city, and fallback coordinates (`latitude`, `longitude`) from RFC 8805 geofeeds with DB-IP City Lite (CC BY 4.0) fallback (`is_fallback`) |
+| `geolocations` | IP range, IP version, country, region, city, and coordinates (`latitude`, `longitude`) from RFC 8805 geofeeds (backfilled by matching `(country, city)` when absent from the feed) with DB-IP City Lite (CC BY 4.0) fallback (`is_fallback`) |
 
 `GET /v1/prefix?prefix=:cidr` returns a normalized CIDR descriptor, its
 covering allocation record, and cursor-paginated registered RPSL route

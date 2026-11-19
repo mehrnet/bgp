@@ -16,9 +16,9 @@ RIR, RDAP, routing, or geolocation services while handling a request.
 
 | Capability | Full API (`https://bgp-api.mehrnet.com`) | Lite API (`https://bgp-lite.mehrnet.com`) |
 | :--- | :--- | :--- |
-| Runtime | Bare-metal Rust + zero-copy `mmap` (`MNMF`) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~38 MiB) |
+| Runtime | Bare-metal Rust + zero-copy `mmap` (`MNMF`) | Standalone Cloudflare Worker + `bgp-lite.mnl` (~49 MiB) |
 | `GET /v1/health` | Yes (`database: "mmap"`) | Yes (`mode: "lite"`, `database: "lite"`) |
-| `GET /v1/ip?query=:ip` | Full IP, route, allocation, geofeed (`country_code`, `region`, `city`), WHOIS (`netname`, `abuse_contact`, dates) | IP, route (`cidr`, `asns`, `origins`), allocation (`registry`, `country_code`, `/32` v4 & `/64` v6), geofeed (`country_code`, `region`, `city`); omits WHOIS prose & `details=full` |
+| `GET /v1/ip?query=:ip` | Full IP, route, allocation, geofeed (`country_code`, `region`, `city`, `latitude`, `longitude`), WHOIS (`netname`, `abuse_contact`, dates) | IP, route (`cidr`, `asns`, `origins`), allocation (`registry`, `country_code`, `/32` v4 & `/64` v6), geofeed (`country_code`, `region`, `city`, `latitude`, `longitude`); omits WHOIS prose & `details=full` |
 | `GET /v1/country?query=:ip` | — | Yes (plain text or `?format=json`) |
 | `GET /v1/asn?query=:asn` | Full `aut-num` + paginated route objects with IRR metadata | `aut-num` (`name`, `organization`, `registry`, `country_code`, `status`, `source`, `maintainers`, `abuse_contact`, `description`) + paginated route prefixes |
 | `GET /v1/prefix?prefix=:cidr` | Covering allocation + all overlapping IRR route objects | Covering allocation + winning route objects |
@@ -26,14 +26,19 @@ RIR, RDAP, routing, or geolocation services while handling a request.
 
 ## Install
 
-### Requirements
+### Requirements & Recommended Hardware
 
-- Linux with systemd
-- `amd64` or `arm64`
-- Root access
-- An active release database plus temporary space for a second copy during updates
+- **OS & privilege:** Linux with `systemd`, `amd64` or `arm64`, root access (no Rust toolchain required for release installs).
 
-Rust and a compiler are not required for production installation.
+Because `bgp-api` maps the immutable `MNMF` database (~`4.1 GiB` uncompressed) directly via `mmap` with `MADV_RANDOM`, cold uncached lookups fault 4 KiB pages straight from the Linux page cache or disk:
+
+| Tier | CPU | RAM | Disk (NVMe/SSD) | Runtime profile (`BGP_API_CACHE_STRATEGY=auto`) |
+| --- | --- | --- | --- | --- |
+| **Minimum** | 2 vCPUs | **2–4 GiB** | **12+ GiB free** | `minimal` (`< ~2.3 GiB` RAM) or `balanced` (**4 GiB RAM**: keeps `~1.5 GiB` LPM selectors + `320 MiB` response caches resident; cold records fault from SSD) |
+| **Recommended (Production)** | **4+ vCPUs** | **8+ GiB** | **20+ GiB free** | `full` (`>= dataset + 160 MiB caches + 768 MiB reserve ≈ 5.0 GiB`: warms the entire `mmap` file in Linux page cache for zero-disk-I/O `details=full` / range scans and leaves headroom for blue-green staging) |
+
+- **Disk note for updates:** Blue-green updates temporarily hold the active `.mmap`, the compressed download (`~0.9 GiB`), and the staged `.mmap` slot (~`9+ GiB` combined) before deleting the old slot. Hosts with tighter free space automatically fall back to stop-and-replace.
+- **Allocator:** Static `amd64` musl release binaries link `tikv-jemallocator` for lock-free multi-threaded allocation; removing `GOMAXPROCS=2` lets Tokio scale across all host vCPUs.
 
 ### Local service
 
@@ -89,12 +94,12 @@ sudo /srv/bgp-api/install.sh --update
 
 Updates use the inactive slot when Caddy is configured:
 
-1. Download and verify the release.
-2. Validate the database and binary.
-3. Release optional caches in the active slot if memory is constrained.
-4. Fully warm the inactive slot before it opens its listener, then check its health.
-5. Atomically move Caddy to the warmed slot, retaining the old slot as a retry target during its drain grace period.
-6. Stop the old slot and remove its database.
+1. Check the latest release tag, publish timestamp, and binary/dataset asset digests (if only the binary changed or `/usr/local/bin/bgp-api` differs, update and restart the active slot in place without re-downloading the database archive).
+2. Download and verify the database and binary archives against `SHA256SUMS.txt`.
+3. Validate the extracted `.mmap` file before touching active traffic.
+4. Release optional response caches in the active slot (`SIGUSR2`) if `MemAvailable` is constrained.
+5. Stage blocking cache warmup for the inactive slot via a transient `/run/systemd/system/<service>.d/` drop-in (without mutating `/etc/bgp-api/*.env`), then run `/v1/health` against the staged listener.
+6. Atomically move Caddy to the warmed slot, retaining the old slot as a retry target during its drain grace period, then stop and delete the old slot (rolling back via `rollback_staged_slot` on any failure).
 
 This keeps planned dataset updates available without rebuilding indexes on the server.
 If Caddy is unavailable, disk space is insufficient, or `BGP_API_BLUE_GREEN=0` is set,
@@ -224,24 +229,24 @@ The installer writes `/etc/bgp-api/bgp-api.env`:
 | `BGP_API_BLUE_GREEN` | `auto` | `auto`, `1`, or `0` |
 | `BGP_API_STARTUP_TIMEOUT_SECONDS` | `300` | Maximum wait for a staged API slot to become healthy |
 | `BGP_API_CACHE_STRATEGY` | `auto` | `auto`, `minimal`, `balanced`, or `full` |
-| `BGP_API_DEFER_CACHE_WARMUP` | `0` | Start serving before cache warmup; the updater uses this internally |
-| `BGP_API_BLOCK_UNTIL_CACHE_WARMUP` | `0` | Finish the selected warmup before opening the listener; the updater uses this for the staged slot |
+| `BGP_API_DEFER_CACHE_WARMUP` | `0` | Start serving before cache warmup |
+| `BGP_API_BLOCK_UNTIL_CACHE_WARMUP` | `0` | Finish the selected warmup before opening the listener (set transiently by the updater via `/run/systemd/system/` drop-in) |
 | `BGP_API_RUNTIME_CACHE_CONTROL` | `1` | Enable `SIGUSR2` release of optional in-process caches for a memory-constrained staged update |
 | `BGP_API_STAGE_MEMORY_RESERVE_MIB` | `768` | Minimum `MemAvailable` before the updater asks the active slot to release optional caches |
 | `BGP_API_DRAIN_GRACE_SECONDS` | `45` | Keep the old backend running after the Caddy switch so stale proxy connections can finish |
 | `CORS_ALLOWED_ORIGINS_JSON` | empty | JSON array of browser origins |
 | `ORIGIN_AUTH_TOKEN` | empty | Proxy-to-origin authentication token |
-| `BGP_API_COMPACT_CACHE_MIB` | strategy default | Override the in-process cache budget for default IP responses |
-| `BGP_API_RESOURCE_CACHE_MIB` | strategy default | Override the in-process cache budget for prefix, range, and ASN responses |
-| `GOMAXPROCS` | host CPU count | Worker threads override (`1`–`256`) |
+| `BGP_API_COMPACT_CACHE_MIB` | strategy default | Override the 16-shard in-process `RwLock` cache budget for default IP responses |
+| `BGP_API_RESOURCE_CACHE_MIB` | strategy default | Override the 16-shard in-process `RwLock` cache budget for prefix, range, and ASN responses |
+| `GOMAXPROCS` | host CPU count | Worker threads override (`1`–`256`); omitted by `install.sh` so Tokio uses all host vCPUs |
 
 `auto` selects the safest profile from the deployed `mmap` file size and `MemTotal`:
 
-| Profile | Runtime behavior |
+| Profile | Threshold & runtime behavior |
 | --- | --- |
-| `minimal` | `64 MiB` compact cache, `16 MiB` resource cache, no dataset preload |
-| `balanced` | `256 MiB` compact cache, `64 MiB` resource cache, warming the LPM selector slices in the kernel page cache (without copying the dataset onto the heap) |
-| `full` | `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable `mmap` file through the Linux page cache |
+| `minimal` | Fallback when below `balanced` threshold: `64 MiB` compact cache, `16 MiB` resource cache, no preload |
+| `balanced` | Requires `selectors + 320 MiB caches + 512 MiB reserve`: `256 MiB` compact cache, `64 MiB` resource cache, warms the LPM selector slices in the kernel page cache |
+| `full` | Requires `database + 160 MiB caches + 768 MiB reserve`: `128 MiB` compact cache, `32 MiB` resource cache, then a sequential warm of the immutable `mmap` file through the Linux page cache |
 
 `full` does not copy the database into process heap memory. It needs the dataset, response-cache
 budget, and a `768 MiB` operating-system reserve to fit at once, while the kernel
@@ -289,9 +294,10 @@ export BGP_API_DATABASE_PATH="$PWD/mehrnet_bgp.mmap"
 cargo run --release -p bgp-api-server --bin bgp-api
 ```
 
-Build a static Linux `amd64` musl binary:
+Build a static Linux `amd64` musl binary (`musl-tools` required on the build host for `tikv-jemalloc-sys`):
 
 ```sh
+sudo apt-get install -y musl-tools
 CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld \
 RUSTFLAGS="-C target-feature=+crt-static" \
 cargo build --release --target x86_64-unknown-linux-musl -p bgp-api-server --bin bgp-api
@@ -325,6 +331,7 @@ cargo run --release -p bgp-sqlite --bin validate-database -- -indexed mehrnet_bg
 ## Development
 
 ```sh
+shellcheck install.sh scripts/*.sh
 ./scripts/check-quality.sh
 npm --prefix lite test
 ```
