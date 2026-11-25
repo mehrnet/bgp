@@ -1,0 +1,27 @@
+MehrBGP Notice & Data Attribution
+==================================
+
+The software source code in this repository is licensed under the MIT License
+(see LICENSE).
+
+Compiled dataset releases (including MNMF mmap snapshots, SQLite exports,
+MNL1 lite databases, and MNCC country databases) aggregate third-party internet
+routing, allocation, and geolocation datasets whose underlying terms remain in
+effect:
+
+1. IP Geolocation Fallback (DB-IP City Lite)
+   Fallback city, region, and coordinate records include IP Geolocation data by
+   DB-IP (https://db-ip.com), licensed under Creative Commons Attribution 4.0
+   International (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+   Downstream redistributors of compiled dataset releases must preserve this
+   attribution.
+
+2. Regional Internet Registries (RIR / IRR Bulk Data)
+   IP allocation, ASN aut-num, and route records are derived from public bulk
+   delegated and WHOIS/IRR datasets published by RIPE NCC, ARIN, APNIC, LACNIC,
+   and AFRINIC, and remain subject to each registry's respective terms of use
+   and acceptable use policies.
+
+3. Operator Geofeeds (RFC 8805)
+   Primary geofeed location overrides are fetched from network-operator
+   published RFC 8805 CSV feeds referenced by RIR remarks/geofeed attributes.
